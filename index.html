@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#f7fafa">
+  <title>Crafty Central</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icon.svg">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Crafty">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+
+  <div class="app" id="app">
+
+    <!-- ===== Sidebar (desktop) / bottom tab bar (mobile) ===== -->
+    <nav class="sidebar" id="sidebar">
+      <div class="sidebar-brand">
+        <div class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11h18M5 11V7a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v4M5 11l-1 8h16l-1-8M9 15h6"/></svg>
+        </div>
+        <div class="brand-text">
+          <span class="brand-name">Crafty</span>
+          <span class="brand-sub">Central</span>
+        </div>
+      </div>
+      <div class="sidebar-nav" id="navLinks"></div>
+      <div class="sidebar-foot">
+        <div class="role-switch" id="roleSwitch"></div>
+      </div>
+    </nav>
+
+    <!-- ===== Main column ===== -->
+    <div class="main-col">
+      <header class="topbar">
+        <div class="topbar-title" id="topbarTitle">Dashboard</div>
+        <div class="topbar-actions">
+          <button class="icon-btn" id="notifBtn" title="Notifications" aria-label="Notifications">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+            <span class="notif-dot" id="notifDot" hidden></span>
+          </button>
+          <div class="topbar-user" id="topbarUser"></div>
+        </div>
+      </header>
+      <main class="content" id="content"></main>
+    </div>
+
+    <!-- ===== Job detail side panel ===== -->
+    <aside class="panel" id="panel" hidden>
+      <div class="panel-inner" id="panelInner"></div>
+    </aside>
+    <div class="panel-scrim" id="panelScrim" hidden></div>
+
+    <!-- ===== Notification drawer ===== -->
+    <aside class="notif-drawer" id="notifDrawer" hidden>
+      <div class="notif-head">
+        <span>Notifications</span>
+        <button class="text-btn" id="notifClearBtn">Mark all read</button>
+      </div>
+      <div class="notif-list" id="notifList"></div>
+    </aside>
+
+    <!-- ===== Modal ===== -->
+    <div class="modal-scrim" id="modalScrim" hidden>
+      <div class="modal" id="modal" role="dialog" aria-modal="true"></div>
+    </div>
+
+    <!-- ===== Toasts ===== -->
+    <div class="toast-rail" id="toastRail"></div>
+  </div>
+
+  <!-- ===== Auth screen (shown only when Firebase is configured) ===== -->
+  <div class="auth-screen" id="authScreen" hidden>
+    <div class="auth-card">
+      <div class="auth-brand">
+        <div class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11h18M5 11V7a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v4M5 11l-1 8h16l-1-8M9 15h6"/></svg>
+        </div>
+        <div class="brand-text">
+          <span class="brand-name">Crafty</span>
+          <span class="brand-sub">Central</span>
+        </div>
+      </div>
+
+      <h1 class="auth-title" id="authTitle">Sign in</h1>
+      <p class="auth-sub" id="authSub">Log in with your Crafty account.</p>
+
+      <form id="authForm" hidden>
+        <div class="field" id="authNameField" hidden>
+          <label for="authName">Your name</label>
+          <input type="text" id="authName" autocomplete="name" placeholder="First and last name">
+        </div>
+        <div class="field">
+          <label for="authEmail">Email</label>
+          <input type="email" id="authEmail" required autocomplete="email" inputmode="email">
+        </div>
+        <div class="field">
+          <label for="authPass">Password</label>
+          <input type="password" id="authPass" required minlength="6" autocomplete="current-password">
+        </div>
+        <div class="auth-err" id="authErr" hidden></div>
+        <button class="btn primary" id="authSubmit" type="submit" style="width:100%;justify-content:center">
+          <span id="authSubmitText">Sign in</span>
+        </button>
+      </form>
+
+      <button class="text-btn" id="authToggle" hidden>First time here? Create your account</button>
+
+      <div class="auth-loading" id="authLoading">
+        <span class="auth-spinner" aria-hidden="true"></span>
+        <span id="authLoadingText">Connecting…</span>
+      </div>
+    </div>
+  </div>
+
+  <script src="firebase-config.js"></script>
+  <script src="js/icons.js"></script>
+  <script src="js/store.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/views/dashboard.js"></script>
+  <script src="js/views/calendar.js"></script>
+  <script src="js/views/schedule.js"></script>
+  <script src="js/views/chat.js"></script>
+  <script src="js/views/directory.js"></script>
+  <script src="js/views/finances.js"></script>
+  <script type="module" src="js/cloud.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
