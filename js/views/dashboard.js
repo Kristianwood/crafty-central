@@ -72,6 +72,30 @@ Views.dashboard = (() => {
             <div class="e-sub" style="margin-top:10px">Sample data fills the calendar, finances, and chat with three demo jobs so you can try every feature — delete them anytime.</div>` : ''}
           </div>`}
 
+        ${Store.can('createJob') && Store.newInquiries().length ? `
+        <div class="section-head">
+          <div>
+            <div class="section-title">New inquiries</div>
+            <div class="section-hint">From the outreach form — turn one into a hold or dismiss it.</div>
+          </div>
+        </div>
+        <div class="timeoff-card">
+          ${Store.newInquiries().map(q => `
+            <div class="inq-row">
+              <div class="inq-main">
+                <span class="inq-co">${UI.esc(q.company)}</span>
+                <span class="inq-meta">
+                  ${q.shootDays && q.shootDays.length ? UI.esc(UI.fmtRange(q.shootDays.slice().sort()[0], q.shootDays.slice().sort()[q.shootDays.length - 1])) + ' · ' : ''}${UI.esc(q.intExt || '?')} · ${UI.esc(q.dayNight || '?')} · ~${q.headcount || '?'} on set${q.pm ? ' · PM: ' + UI.esc(q.pm) : ''}
+                </span>
+                <span class="inq-contact">${UI.esc([q.email, q.phone].filter(Boolean).join(' · '))}${q.notes ? ` — “${UI.esc(q.notes)}”` : ''}</span>
+              </div>
+              <div class="to-actions">
+                <button class="btn sm" data-inq-convert="${q.id}">${ICONS.check} Create hold</button>
+                <button class="btn sm danger" data-inq-dismiss="${q.id}">Dismiss</button>
+              </div>
+            </div>`).join('')}
+        </div>` : ''}
+
         ${pendingTO.length && Store.can('approveTimeOff') ? `
         <div class="section-head">
           <div class="section-title">Time-off requests</div>
@@ -108,6 +132,17 @@ Views.dashboard = (() => {
     });
     el.querySelectorAll('[data-person-sched]').forEach(r => {
       r.onclick = () => openPersonSchedule(r.dataset.personSched);
+    });
+    el.querySelectorAll('[data-inq-convert]').forEach(b => b.onclick = () => {
+      const job = Store.convertInquiry(b.dataset.inqConvert);
+      UI.toast(job ? 'Hold created — it is on the calendar' : 'Could not convert', job ? 'check' : 'alert');
+      App.refreshView(); App.refreshBadges();
+      if (job) UI.openJobPanel(job.id);
+    });
+    el.querySelectorAll('[data-inq-dismiss]').forEach(b => b.onclick = () => {
+      Store.dismissInquiry(b.dataset.inqDismiss);
+      UI.toast('Inquiry dismissed', 'x');
+      App.refreshView(); App.refreshBadges();
     });
   }
 
@@ -376,7 +411,7 @@ Views.dashboard = (() => {
           <div class="field">
             <label>Status</label>
             <select name="status">
-              ${['estimate', 'confirmed', 'wrapped'].map(o => `<option value="${o}" ${j?.status === o ? 'selected' : ''}>${o[0].toUpperCase() + o.slice(1)}</option>`).join('')}
+              ${[['estimate', 'Hold'], ['confirmed', 'Confirmed'], ['wrapped', 'Wrapped']].map(([v, l]) => `<option value="${v}" ${j?.status === v ? 'selected' : ''}>${l}</option>`).join('')}
             </select>
           </div>
           ${Store.get().menus.length ? `

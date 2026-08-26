@@ -102,7 +102,7 @@ Views.schedule = (() => {
         <div class="job-main">
           <div class="job-name">${UI.esc(j.productionName)}${myRole ? ` <span class="crew-role-tag">${UI.esc(myRole)}</span>` : ''}</div>
           <div class="job-meta">
-            <span>${ICONS.clock}Call ${UI.fmtTime12(j.callTime)}</span>
+            <span>${ICONS.clock}Call ${UI.fmtTime12(Store.dayVal(j, first, 'callTime'))}</span>
             <span>${ICONS.pin}${UI.esc((j.location || '—').split(',')[0])}</span>
             <span>${ICONS.people}${j.headcount} on set</span>
           </div>

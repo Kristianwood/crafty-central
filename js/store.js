@@ -31,6 +31,9 @@ const Store = (() => {
   /* Crew roles a person can be tagged with, and booked on a job as */
   const CREW_ROLES = ['Driver', 'Chef', 'Key', 'Assist'];
 
+  /* Dietary restriction options for on-set crew */
+  const DIETARY = ['Vegetarian', 'Vegan', 'Pescatarian', 'Gluten-free', 'Dairy-free', 'Halal', 'Kosher', 'Nut allergy', 'Shellfish allergy'];
+
   /* ---------- normalizers (migrate old-shape docs from either mode) ----------
      jobs: crew used to be an array of person ids — now [{role, personId}].
      people: tags (crew-role tags) may be missing on older docs; infer from
@@ -38,6 +41,7 @@ const Store = (() => {
   function normalizeJob(j) {
     j.crew = (j.crew || []).map(c =>
       typeof c === 'string' ? { role: 'Assist', personId: c } : c);
+    j.dayInfo = j.dayInfo || {}; // per-shoot-day overrides, keyed by ISO date
     return j;
   }
   function inferTags(position) {
@@ -76,6 +80,7 @@ const Store = (() => {
         shootDays: [addDays(T, 1), addDays(T, 2)], callTime: '06:30', wrapTime: '19:00',
         status: 'confirmed', crew: [{ role: 'Key', personId: 'p-kei' }, { role: 'Chef', personId: 'p-roc' }, { role: 'Assist', personId: 'p-pri' }], menu: ['Breakfast burritos', 'Espresso bar', 'Harvest bowls', 'Afternoon snack table'],
         rates: { perHead: 34, truckDay: 850 }, notes: 'Client is nut-free across the board. Talent trailer needs a separate tray at 07:00.',
+        dayInfo: { [addDays(T, 2)]: { callTime: '08:30', headcount: 48, notes: 'Company move to Studio B — smaller unit.' } },
         createdAt: addDays(T, -12),
       },
       {
@@ -125,6 +130,16 @@ const Store = (() => {
       { id: 'm-wrap', name: 'Wrap Party', items: ['Souvlaki + pita station', 'Greek salad bowls', 'Loukoumades', 'Sparkling lemonade + iced coffee'] },
     ];
 
+    const setCrew = [
+      { id: 'sc-1', name: 'Wren Kalogeropoulos', position: '1st AD', dietary: ['Vegetarian'], notes: 'Prefers oat milk for coffee.' },
+      { id: 'sc-2', name: 'Bo Lindqvist-Osei', position: 'Gaffer', dietary: ['Nut allergy'], notes: 'Severe — keep his plate clear of the snack table.' },
+      { id: 'sc-3', name: 'Camille Iwu', position: 'Director', dietary: ['Gluten-free', 'Dairy-free'], notes: '' },
+    ];
+
+    const inquiries = [
+      { id: 'inq-1', company: 'Parkdale Pictures', pm: 'Sana Whitfield', email: 'sana@parkdalepictures.ca', phone: '+1 (416) 555-0139', intExt: 'INT + EXT', dayNight: 'Day', headcount: 45, shootDays: [addDays(T, 12), addDays(T, 13)], notes: 'Two-day spot near High Park, tight turnaround.', createdAt: new Date().toISOString(), status: 'new' },
+    ];
+
     const invoices = [
       { id: 'inv-1', jobId: 'j-5', number: 'CR-2026-041', issuedOn: addDays(T, -12), dueOn: addDays(T, 18), status: 'sent', taxRate: 0.13 },
       { id: 'inv-2', jobId: 'j-4', number: 'CR-2026-042', issuedOn: addDays(T, -4), dueOn: addDays(T, 26), status: 'paid', taxRate: 0.13 },
@@ -153,7 +168,7 @@ const Store = (() => {
     return {
       v: 1,
       currentUserId: 'p-mar',
-      people, jobs, companies, menus, invoices, timeOff, messages, notifications,
+      people, jobs, companies, menus, setCrew, inquiries, invoices, timeOff, messages, notifications,
       chatRead: {},
       settings: { ...DEFAULT_SETTINGS },
     };
@@ -162,7 +177,7 @@ const Store = (() => {
   function emptyState() {
     return {
       v: 1, currentUserId: null,
-      people: [], jobs: [], companies: [], menus: [], invoices: [], timeOff: [], messages: [], notifications: [],
+      people: [], jobs: [], companies: [], menus: [], setCrew: [], inquiries: [], invoices: [], timeOff: [], messages: [], notifications: [],
       chatRead: {},
       settings: { ...DEFAULT_SETTINGS },
     };
@@ -212,7 +227,7 @@ const Store = (() => {
   }
 
   /* ---------- cloud boot ---------- */
-  const COLS = ['people', 'jobs', 'companies', 'menus', 'invoices', 'timeOff', 'messages', 'notifications'];
+  const COLS = ['people', 'jobs', 'companies', 'menus', 'setCrew', 'inquiries', 'invoices', 'timeOff', 'messages', 'notifications'];
 
   async function enterCloud(user) {
     cloud = true;
@@ -313,10 +328,31 @@ const Store = (() => {
     return out;
   }
 
+  /* ---------- per-day details ----------
+     Each shoot day can override callTime / wrapTime / headcount /
+     location / notes; anything unset falls back to the job-level value. */
+  function dayVal(j, date, field) {
+    const d = j.dayInfo && j.dayInfo[date];
+    if (d && d[field] !== undefined && d[field] !== '' && d[field] !== null) return d[field];
+    return j[field];
+  }
+  function setDayInfo(jobId, date, patch) {
+    const j = job(jobId);
+    if (!j) return;
+    j.dayInfo = j.dayInfo || {};
+    j.dayInfo[date] = { ...(j.dayInfo[date] || {}), ...patch };
+    put('jobs', j);
+    save();
+  }
+  /* total covers across all shoot days, honouring per-day headcounts */
+  function totalCovers(j) {
+    return j.shootDays.reduce((sum, d) => sum + (+dayVal(j, d, 'headcount') || 0), 0);
+  }
+
   /* ---------- money ---------- */
   function jobSubtotal(j) {
     const days = j.shootDays.length || 1;
-    return (j.headcount * (j.rates?.perHead ?? state.settings.perHeadDefault) * days)
+    return (totalCovers(j) * (j.rates?.perHead ?? state.settings.perHeadDefault))
       + ((j.rates?.truckDay ?? state.settings.truckDayDefault) * days);
   }
   function invoiceTotal(inv) {
@@ -580,6 +616,63 @@ const Store = (() => {
     save();
   }
 
+  /* ---------- on-set crew (production-side people we feed) ---------- */
+  const setCrewMember = (id) => state.setCrew.find(c => c.id === id);
+
+  function upsertSetCrew(data) {
+    const existing = data.id && setCrewMember(data.id);
+    if (existing) { Object.assign(existing, data); put('setCrew', existing); }
+    else {
+      data.id = 'sc-' + uid();
+      data.dietary = data.dietary || [];
+      state.setCrew.push(data);
+      put('setCrew', data);
+    }
+    save();
+    return data;
+  }
+  function deleteSetCrew(id) {
+    state.setCrew = state.setCrew.filter(c => c.id !== id);
+    del('setCrew', id);
+    save();
+  }
+
+  /* ---------- outreach inquiries ---------- */
+  function newInquiries() {
+    return state.inquiries.filter(i => i.status === 'new')
+      .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+  }
+  function convertInquiry(id) {
+    const inq = state.inquiries.find(i => i.id === id);
+    if (!inq) return null;
+    const j = upsertJob({
+      productionName: 'TBC — ' + inq.company,
+      productionCompany: inq.company,
+      agency: '', pm: inq.pm || '', producers: '',
+      headcount: +inq.headcount || 0,
+      location: '',
+      shootDays: (inq.shootDays || []).slice().sort(),
+      callTime: '07:00', wrapTime: '19:00',
+      status: 'estimate',
+      crew: [], menu: [],
+      rates: { perHead: state.settings.perHeadDefault, truckDay: state.settings.truckDayDefault },
+      notes: `From outreach form — ${inq.intExt || '?'} · ${inq.dayNight || '?'}.` +
+        (inq.email || inq.phone ? ` Contact: ${[inq.email, inq.phone].filter(Boolean).join(' · ')}.` : '') +
+        (inq.notes ? ` "${inq.notes}"` : ''),
+    });
+    inq.status = 'converted';
+    put('inquiries', inq);
+    save();
+    return j;
+  }
+  function dismissInquiry(id) {
+    const inq = state.inquiries.find(i => i.id === id);
+    if (!inq) return;
+    inq.status = 'dismissed';
+    put('inquiries', inq);
+    save();
+  }
+
   function upsertCompany(data) {
     const existing = data.id && company(data.id);
     if (existing) { Object.assign(existing, data); put('companies', existing); }
@@ -723,7 +816,10 @@ const Store = (() => {
     iso, todayISO, addDays,
     me, person, job, role, can, setUser,
     visibleJobs, jobsOn, missing,
-    CREW_ROLES, crewIds, addCrew, removeCrew, candidatesFor,
+    CREW_ROLES, DIETARY, crewIds, addCrew, removeCrew, candidatesFor,
+    dayVal, setDayInfo, totalCovers,
+    setCrewMember, upsertSetCrew, deleteSetCrew,
+    newInquiries, convertInquiry, dismissInquiry,
     personJobs, personUpcomingDays, personBookedDays,
     jobSubtotal, invoiceTotal,
     upsertJob, deleteJob, addMenuItem, removeMenuItem,

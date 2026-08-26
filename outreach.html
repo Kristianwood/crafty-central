@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#f7fafa">
+  <title>Book Crafty — Craft Service for Your Shoot</title>
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/app.css">
+  <style>
+    .outreach-wrap { min-height: 100dvh; display: grid; place-items: center; padding: 28px 16px 60px; background: var(--bg); }
+    .outreach-card { width: 100%; max-width: 560px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-lg); box-shadow: var(--shadow); padding: 30px 28px; animation: view-in .45s var(--ease) both; }
+    .oc-title { font-size: 22px; font-weight: 700; letter-spacing: -.02em; margin: 18px 0 6px; }
+    .oc-sub { font-size: 14px; color: var(--ink-2); margin-bottom: 22px; line-height: 1.55; }
+    .oc-done { text-align: center; padding: 30px 10px; }
+    .oc-done .big { width: 52px; height: 52px; border-radius: 50%; background: var(--green-soft); color: var(--green); display: grid; place-items: center; margin: 0 auto 16px; }
+    .oc-done .big svg { width: 26px; height: 26px; }
+    .oc-foot { text-align: center; font-size: 12px; color: var(--ink-3); margin-top: 18px; }
+  </style>
+</head>
+<body>
+  <div class="outreach-wrap">
+    <div class="outreach-card">
+      <div class="auth-brand">
+        <div class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11h18M5 11V7a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v4M5 11l-1 8h16l-1-8M9 15h6"/></svg>
+        </div>
+        <div class="brand-text">
+          <span class="brand-name">Crafty</span>
+          <span class="brand-sub">Craft Service · Toronto</span>
+        </div>
+      </div>
+
+      <div id="formWrap">
+        <h1 class="oc-title">Tell us about your shoot</h1>
+        <p class="oc-sub">A few quick details and we'll come back to you with availability and a number — usually same day.</p>
+
+        <form id="outreachForm">
+          <div class="form-grid">
+            <div class="field wide">
+              <label>Production company *</label>
+              <input type="text" name="company" required placeholder="Who's producing">
+            </div>
+            <div class="field">
+              <label>PM name</label>
+              <input type="text" name="pm" placeholder="Production manager">
+            </div>
+            <div class="field">
+              <label>Rough headcount *</label>
+              <input type="number" name="headcount" required min="1" placeholder="People on set" inputmode="numeric">
+            </div>
+            <div class="field">
+              <label>INT / EXT</label>
+              <select name="intExt">
+                <option>INT</option>
+                <option>EXT</option>
+                <option selected>INT + EXT</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Day / Night</label>
+              <select name="dayNight">
+                <option selected>Day</option>
+                <option>Night</option>
+                <option>Both</option>
+              </select>
+            </div>
+            <div class="field wide">
+              <label>Shoot days</label>
+              <div style="display:flex;gap:8px">
+                <input type="date" id="dayPicker" style="flex:1">
+                <button type="button" class="btn" id="dayAddBtn">+ Add day</button>
+              </div>
+              <div class="day-chips" id="dayChips" style="margin-top:8px"><span style="font-size:12px;color:var(--ink-3)">No days added yet.</span></div>
+            </div>
+            <div class="field">
+              <label>Your email *</label>
+              <input type="email" name="email" required placeholder="So we can get back to you" autocomplete="email">
+            </div>
+            <div class="field">
+              <label>Phone</label>
+              <input type="tel" name="phone" placeholder="Optional" autocomplete="tel">
+            </div>
+            <div class="field wide">
+              <label>Anything else?</label>
+              <textarea name="notes" rows="3" placeholder="Location, special requests, dietary-heavy cast…"></textarea>
+            </div>
+          </div>
+          <div class="auth-err" id="formErr" hidden></div>
+          <button type="submit" class="btn primary" id="sendBtn" style="width:100%;justify-content:center;margin-top:4px">Send it over</button>
+        </form>
+      </div>
+
+      <div id="doneWrap" hidden>
+        <div class="oc-done">
+          <span class="big"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
+          <h1 class="oc-title" style="margin-top:0">Got it — thanks!</h1>
+          <p class="oc-sub" style="margin-bottom:0">Your shoot details are with the Crafty team. We'll be in touch shortly to lock it in.</p>
+        </div>
+      </div>
+
+      <div class="oc-foot">Crafty · food truck &amp; craft service for film — Toronto, ON</div>
+    </div>
+  </div>
+
+  <script src="firebase-config.js"></script>
+  <script type="module">
+    /* Public inquiry form — writes a single doc into the `inquiries`
+       collection, which is the only publicly-writable collection
+       (see security rules). No sign-in required. */
+    const days = [];
+    const chips = document.getElementById('dayChips');
+    const picker = document.getElementById('dayPicker');
+    const err = document.getElementById('formErr');
+
+    const fmt = (iso) => new Date(iso + 'T00:00:00')
+      .toLocaleDateString('en-CA', { weekday: 'short', month: 'short', day: 'numeric' });
+
+    function renderChips() {
+      days.sort();
+      chips.innerHTML = days.length
+        ? days.map((d, i) => `<span class="day-chip">${fmt(d)}<button type="button" data-del="${i}" aria-label="Remove">&times;</button></span>`).join('')
+        : '<span style="font-size:12px;color:var(--ink-3)">No days added yet.</span>';
+      chips.querySelectorAll('[data-del]').forEach(b => b.onclick = () => { days.splice(+b.dataset.del, 1); renderChips(); });
+    }
+    document.getElementById('dayAddBtn').onclick = () => {
+      if (picker.value && !days.includes(picker.value)) { days.push(picker.value); renderChips(); }
+    };
+
+    let db = null, fs = null;
+    if (window.FIREBASE_CONFIG) {
+      try {
+        const V = '10.12.2';
+        const [{ initializeApp }, fsMod] = await Promise.all([
+          import(`https://www.gstatic.com/firebasejs/${V}/firebase-app.js`),
+          import(`https://www.gstatic.com/firebasejs/${V}/firebase-firestore.js`),
+        ]);
+        fs = fsMod;
+        db = fsMod.getFirestore(initializeApp(window.FIREBASE_CONFIG));
+      } catch (e) { console.error(e); }
+    }
+
+    document.getElementById('outreachForm').onsubmit = async (e) => {
+      e.preventDefault();
+      err.hidden = true;
+      const f = e.target;
+      if (!db) {
+        err.textContent = 'The form is offline right now — email us instead and we will sort you out.';
+        err.hidden = false;
+        return;
+      }
+      const btn = document.getElementById('sendBtn');
+      btn.disabled = true;
+      btn.textContent = 'Sending…';
+      const id = 'inq-' + Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-3);
+      try {
+        await fs.setDoc(fs.doc(db, 'inquiries', id), {
+          id,
+          company: f.elements.company.value.trim(),
+          pm: f.elements.pm.value.trim(),
+          headcount: +f.elements.headcount.value || 0,
+          intExt: f.elements.intExt.value,
+          dayNight: f.elements.dayNight.value,
+          shootDays: days.slice(),
+          email: f.elements.email.value.trim(),
+          phone: f.elements.phone.value.trim(),
+          notes: f.elements.notes.value.trim(),
+          createdAt: new Date().toISOString(),
+          status: 'new',
+        });
+        document.getElementById('formWrap').hidden = true;
+        document.getElementById('doneWrap').hidden = false;
+      } catch (e2) {
+        console.error(e2);
+        err.textContent = 'Could not send just now — give it another try in a minute.';
+        err.hidden = false;
+        btn.disabled = false;
+        btn.textContent = 'Send it over';
+      }
+    };
+  </script>
+</body>
+</html>

@@ -72,7 +72,7 @@ Views.calendar = (() => {
 
         <div class="cal-legend">
           <span class="lg-item"><span class="lg-swatch" style="background:var(--accent)"></span>Confirmed</span>
-          <span class="lg-item"><span class="lg-swatch" style="background:var(--amber)"></span>Estimate</span>
+          <span class="lg-item"><span class="lg-swatch" style="background:var(--amber)"></span>Hold</span>
           <span class="lg-item"><span class="lg-swatch" style="background:var(--blue)"></span>Wrapped</span>
           ${canSeeTO ? '<span class="lg-item"><span class="lg-swatch" style="background:var(--ink-3)"></span>Approved time off</span>' : ''}
           <span class="lg-item"><span class="cj-miss" style="position:static;display:inline-block"></span>Missing info</span>

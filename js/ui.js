@@ -52,7 +52,8 @@ const UI = (() => {
     return html + '</span>';
   }
 
-  const statusPill = (s) => `<span class="pill ${s}"><span class="pip"></span>${s[0].toUpperCase() + s.slice(1)}</span>`;
+  const STATUS_LABELS = { estimate: 'Hold' };
+  const statusPill = (s) => `<span class="pill ${s}"><span class="pip"></span>${STATUS_LABELS[s] || (s[0].toUpperCase() + s.slice(1))}</span>`;
 
   /* ---------- toasts ---------- */
   function toast(text, icon) {
@@ -86,9 +87,11 @@ const UI = (() => {
      ============================================================ */
   let panelJobId = null;
   let panelHideTimer = null;
+  let panelDayIdx = 0;
 
   function openJobPanel(jobId) {
     panelJobId = jobId;
+    panelDayIdx = 0;
     renderPanel();
     const panel = document.getElementById('panel');
     const scrim = document.getElementById('panelScrim');
@@ -218,6 +221,39 @@ const UI = (() => {
 
     const sub = Store.jobSubtotal(j);
 
+    /* per-day tabs for multi-day jobs */
+    const multiDay = j.shootDays.length > 1;
+    if (panelDayIdx >= j.shootDays.length) panelDayIdx = 0;
+    const activeDate = j.shootDays[panelDayIdx];
+    const dv = (f) => Store.dayVal(j, activeDate, f);
+    const di = (j.dayInfo && j.dayInfo[activeDate]) || {};
+    const dayBlock = !multiDay ? '' : `
+      <div class="day-tabs">
+        ${j.shootDays.map((d, i) => `
+          <button class="seg ${i === panelDayIdx ? 'active' : ''} ${j.dayInfo && j.dayInfo[d] && Object.keys(j.dayInfo[d]).length ? 'has-info' : ''}" data-day-tab="${i}">
+            Day ${i + 1} <span class="seg-sub">${fmtShort(d)}</span>
+          </button>`).join('')}
+      </div>
+      <div class="day-card">
+        <div class="day-card-head">${fmtLong(activeDate)}${di && Object.keys(di).length ? '' : ' · using job defaults'}</div>
+        ${canEdit ? `
+        <div class="day-form">
+          <div class="field"><label>Call</label><input type="time" id="dayCall" value="${esc(dv('callTime') || '')}"></div>
+          <div class="field"><label>Wrap (est.)</label><input type="time" id="dayWrap" value="${esc(dv('wrapTime') || '')}"></div>
+          <div class="field"><label>People on set</label><input type="number" id="dayHead" min="0" value="${esc(dv('headcount') ?? '')}"></div>
+          <div class="field"><label>Location</label><input type="text" id="dayLoc" value="${esc(dv('location') || '')}"></div>
+          <div class="field wide"><label>Notes for this day</label><input type="text" id="dayNotes" value="${esc(di.notes || '')}" placeholder="e.g. company move, night exteriors…"></div>
+          <button class="btn sm primary" id="daySaveBtn" type="button" style="justify-self:start">${ICONS.check} Save day ${panelDayIdx + 1}</button>
+        </div>` : `
+        <div class="fact-grid" style="margin-top:0">
+          <div class="fact"><div class="f-label">Call</div><div class="f-value mono">${fmtTime12(dv('callTime'))}</div></div>
+          <div class="fact"><div class="f-label">Wrap (est.)</div><div class="f-value mono">${fmtTime12(dv('wrapTime'))}</div></div>
+          <div class="fact"><div class="f-label">People on set</div><div class="f-value mono">${dv('headcount') || '—'}</div></div>
+          <div class="fact"><div class="f-label">Location</div><div class="f-value">${esc(dv('location') || '—')}</div></div>
+          ${di.notes ? `<div class="fact wide"><div class="f-label">Day notes</div><div class="f-value" style="font-weight:450;font-size:13px">${esc(di.notes)}</div></div>` : ''}
+        </div>`}
+      </div>`;
+
     inner.innerHTML = `
       <div class="panel-top">
         <div>
@@ -234,14 +270,17 @@ const UI = (() => {
         ${dietBlock}
       </div>
 
+      ${dayBlock}
+
       <div class="fact-grid">
         <div class="fact"><div class="f-label">Shoot days</div><div class="f-value mono">${esc(fmtDays(j.shootDays))}</div></div>
-        <div class="fact"><div class="f-label">Headcount</div><div class="f-value mono">${j.headcount} on set</div></div>
+        <div class="fact"><div class="f-label">${multiDay ? 'Total covers' : 'Headcount'}</div><div class="f-value mono">${multiDay ? Store.totalCovers(j) : j.headcount + ' on set'}</div></div>
+        ${multiDay ? '' : `
         <div class="fact"><div class="f-label">Call</div><div class="f-value mono">${fmtTime12(j.callTime)}</div></div>
-        <div class="fact"><div class="f-label">Wrap (est.)</div><div class="f-value mono">${fmtTime12(j.wrapTime)}</div></div>
+        <div class="fact"><div class="f-label">Wrap (est.)</div><div class="f-value mono">${fmtTime12(j.wrapTime)}</div></div>`}
         ${j.pm ? `<div class="fact"><div class="f-label">Production manager</div><div class="f-value">${esc(j.pm)}</div></div>` : ''}
         ${j.producers ? `<div class="fact${j.pm ? '' : ' wide'}"><div class="f-label">Producer${j.producers.includes(',') ? 's' : ''}</div><div class="f-value">${esc(j.producers)}</div></div>` : ''}
-        <div class="fact wide"><div class="f-label">Location</div><div class="f-value">${esc(j.location || '—')}</div></div>
+        ${multiDay ? '' : `<div class="fact wide"><div class="f-label">Location</div><div class="f-value">${esc(j.location || '—')}</div></div>`}
         ${j.notes ? `<div class="fact wide"><div class="f-label">Notes</div><div class="f-value" style="font-weight:450;font-size:13px">${esc(j.notes)}</div></div>` : ''}
         ${Store.can('finances') ? `<div class="fact wide"><div class="f-label">Estimate value</div><div class="f-value mono">${fmtMoney(sub)} <span style="color:var(--ink-3);font-size:11px">+ HST</span></div></div>` : ''}
       </div>
@@ -261,6 +300,23 @@ const UI = (() => {
 
     /* wire panel events */
     inner.querySelector('#panelCloseBtn').onclick = closeJobPanel;
+
+    inner.querySelectorAll('[data-day-tab]').forEach(b => {
+      b.onclick = () => { panelDayIdx = +b.dataset.dayTab; renderPanel(); };
+    });
+    const daySave = inner.querySelector('#daySaveBtn');
+    if (daySave) daySave.onclick = () => {
+      Store.setDayInfo(j.id, activeDate, {
+        callTime: inner.querySelector('#dayCall').value,
+        wrapTime: inner.querySelector('#dayWrap').value,
+        headcount: +inner.querySelector('#dayHead').value || '',
+        location: inner.querySelector('#dayLoc').value.trim(),
+        notes: inner.querySelector('#dayNotes').value.trim(),
+      });
+      toast(`Day ${panelDayIdx + 1} saved`, 'check');
+      renderPanel();
+      App.refreshView();
+    };
 
     /* crew add: role select filters the person select to matching tags */
     const roleSel = inner.querySelector('#crewRoleSel');

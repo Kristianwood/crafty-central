@@ -46,8 +46,9 @@ const App = (() => {
   /* ---------- nav ---------- */
   function renderNav() {
     const wrap = document.getElementById('navLinks');
-    const pendingTO = Store.can('approveTimeOff')
-      ? Store.get().timeOff.filter(t => t.status === 'pending').length : 0;
+    const pendingTO = (Store.can('approveTimeOff')
+      ? Store.get().timeOff.filter(t => t.status === 'pending').length : 0)
+      + (Store.can('createJob') ? Store.newInquiries().length : 0);
     const chans = Store.myChannels();
     const unreadChat = [chans.company, ...chans.dms].some(c => Store.unread(c));
 

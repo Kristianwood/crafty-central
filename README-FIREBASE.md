@@ -25,12 +25,21 @@ data — chat, jobs, schedules, everything.
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    match /inquiries/{doc} {
+      allow create: if request.resource.data.company is string
+        && request.resource.data.company.size() < 200;
+      allow read, update, delete: if request.auth != null;
+    }
     match /{document=**} {
       allow read, write: if request.auth != null;
     }
   }
 }
 ```
+
+The `inquiries` block is what makes the public outreach form
+(`outreach.html`) work: anyone can *submit* an inquiry, but only
+signed-in team members can read or act on them.
 
 This means: nobody can touch the data without being logged in, and anyone who
 IS logged in (i.e. your team) can read and write. Fine for a small trusted

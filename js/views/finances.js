@@ -66,7 +66,7 @@ Views.finances = (() => {
               <tr class="clickable" data-doc="est:${j.id}">
                 <td><strong>${UI.esc(j.productionName)}</strong><br><span style="color:var(--ink-3);font-size:12px">${UI.esc(j.productionCompany)}</span></td>
                 <td style="font-family:var(--mono);font-size:12.5px">${UI.esc(UI.fmtRange(j.shootDays[0], j.shootDays[j.shootDays.length-1]))}</td>
-                <td class="num">${j.headcount} × ${j.shootDays.length}d</td>
+                <td class="num">${Store.totalCovers(j)} covers</td>
                 <td class="num">${UI.fmtMoney(sub)}</td>
                 <td class="num fin-total">${UI.fmtMoney(sub * 1.13)}</td>
                 <td style="text-align:right"><button class="btn sm" data-confirm-job="${j.id}">${ICONS.check} Confirm</button></td>
@@ -137,7 +137,8 @@ Views.finances = (() => {
     const days = j.shootDays.length;
     const perHead = j.rates?.perHead ?? 33;
     const truck = j.rates?.truckDay ?? 850;
-    const catering = j.headcount * perHead * days;
+    const covers = Store.totalCovers(j);
+    const catering = covers * perHead;
     const truckTotal = truck * days;
     const sub = catering + truckTotal;
     const tax = sub * 0.13;
@@ -167,7 +168,7 @@ Views.finances = (() => {
           <tr><th>Line item</th><th class="num">Qty</th><th class="num">Rate</th><th class="num">Amount</th></tr>
           <tr>
             <td>Full craft service — ${UI.esc(j.productionName)}</td>
-            <td class="num">${j.headcount} × ${days}d</td>
+            <td class="num">${covers} covers</td>
             <td class="num">${UI.fmtMoney(perHead)}</td>
             <td class="num">${UI.fmtMoney(catering)}</td>
           </tr>

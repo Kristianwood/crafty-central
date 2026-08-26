@@ -1,8 +1,9 @@
 /* Crafty Central — service worker: cache the app shell for offline + install */
-const CACHE = 'crafty-central-v4';
+const CACHE = 'crafty-central-v5';
 const SHELL = [
   '.',
   'index.html',
+  'outreach.html',
   'css/app.css',
   'firebase-config.js',
   'js/cloud.js',
