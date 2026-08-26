@@ -182,9 +182,17 @@ const UI = (() => {
           ${j.menu.length ? `<div class="tag-row">${j.menu.map((m, i) => `
             <span class="tag">${esc(m)}${canEdit ? `<button data-menu-del="${i}" aria-label="Remove">${ICONS.x}</button>` : ''}</span>`).join('')}</div>`
             : '<p style="font-size:12.5px;color:var(--ink-3);padding-top:8px">Nothing on the menu yet.</p>'}
+          ${canEdit && Store.get().menus.length ? `
+          <div class="menu-pick">
+            <select id="menuTplSel" aria-label="Saved menu">
+              <option value="">Apply a saved menu…</option>
+              ${Store.get().menus.map(m => `<option value="${m.id}">${esc(m.name)} (${m.items.length})</option>`).join('')}
+            </select>
+            <button class="btn sm" id="menuTplApply" type="button">${ICONS.check} Apply</button>
+          </div>` : ''}
           ${canEdit ? `
           <form class="tag-add" id="menuAddForm">
-            <input type="text" id="menuAddInput" placeholder="Add a menu item…" autocomplete="off">
+            <input type="text" id="menuAddInput" placeholder="${j.menu.length ? 'Add an extra item…' : 'Or add items one by one…'}" autocomplete="off">
             <button class="btn sm" type="submit">${ICONS.plus} Add</button>
           </form>` : ''}
         </div>
@@ -288,6 +296,18 @@ const UI = (() => {
         App.refreshView();
       };
     });
+
+    const tplApply = inner.querySelector('#menuTplApply');
+    if (tplApply) tplApply.onclick = () => {
+      const sel = inner.querySelector('#menuTplSel');
+      const tpl = Store.menuTpl(sel.value);
+      if (!tpl) return;
+      if (j.menu.length && !confirm(`Replace the ${j.menu.length} item${j.menu.length === 1 ? '' : 's'} on this job with the "${tpl.name}" menu?`)) return;
+      Store.setJobMenu(j.id, tpl.items);
+      toast(`"${tpl.name}" applied — ${tpl.items.length} items`, 'menu');
+      renderPanel();
+      App.refreshView();
+    };
 
     const menuForm = inner.querySelector('#menuAddForm');
     if (menuForm) menuForm.onsubmit = (e) => {

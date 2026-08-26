@@ -1,5 +1,5 @@
 /* Crafty Central — service worker: cache the app shell for offline + install */
-const CACHE = 'crafty-central-v3';
+const CACHE = 'crafty-central-v4';
 const SHELL = [
   '.',
   'index.html',
@@ -13,6 +13,7 @@ const SHELL = [
   'js/views/dashboard.js',
   'js/views/calendar.js',
   'js/views/schedule.js',
+  'js/views/menus.js',
   'js/views/chat.js',
   'js/views/directory.js',
   'js/views/finances.js',

@@ -379,6 +379,14 @@ Views.dashboard = (() => {
               ${['estimate', 'confirmed', 'wrapped'].map(o => `<option value="${o}" ${j?.status === o ? 'selected' : ''}>${o[0].toUpperCase() + o.slice(1)}</option>`).join('')}
             </select>
           </div>
+          ${Store.get().menus.length ? `
+          <div class="field wide">
+            <label>Menu <span style="font-weight:400;color:var(--ink-3)">(from the menu library)</span></label>
+            <select name="menuTpl">
+              <option value="">${j?.menu?.length ? `Keep current menu (${j.menu.length} items)` : 'Decide later'}</option>
+              ${Store.get().menus.map(m => `<option value="${m.id}">${UI.esc(m.name)} — ${m.items.length} items</option>`).join('')}
+            </select>
+          </div>` : ''}
           <div class="field wide" data-f="days">
             <label>Shoot days</label>
             <div style="display:flex;gap:8px">
@@ -475,6 +483,11 @@ Views.dashboard = (() => {
         crew: j?.crew || [],
         menu: j?.menu || [],
       };
+      const tplSel = f.elements.menuTpl;
+      if (tplSel && tplSel.value) {
+        const tpl = Store.menuTpl(tplSel.value);
+        if (tpl) data.menu = tpl.items.slice();
+      }
       Store.upsertJob(data);
       UI.closeModal();
       UI.toast(j ? 'Job updated' : 'Job created — it is on the calendar', 'check');

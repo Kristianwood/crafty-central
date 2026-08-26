@@ -13,6 +13,7 @@ const App = (() => {
     { id: 'dashboard', label: 'Dashboard', icon: 'dashboard', roles: ['admin', 'moderator'] },
     { id: 'calendar', label: 'Calendar', icon: 'calendar', roles: ['admin', 'moderator', 'crew'] },
     { id: 'schedule', label: 'My Schedule', icon: 'schedule', roles: ['admin', 'moderator', 'crew'] },
+    { id: 'menus', label: 'Menus', icon: 'menu', roles: ['admin', 'moderator'] },
     { id: 'chat', label: 'Chat', icon: 'chat', roles: ['admin', 'moderator', 'crew'] },
     { id: 'directory', label: 'Directory', icon: 'directory', roles: ['admin', 'moderator', 'crew'] },
     { id: 'finances', label: 'Finances', icon: 'finances', roles: ['admin'] },

@@ -119,6 +119,12 @@ const Store = (() => {
       { id: 'co-cop', name: 'Copperline Films', billingAddress: '1235 Bay St, Suite 700\nToronto ON M5R 3K4', contactName: 'Grover Lindqvist', email: 'billing@copperlinefilms.com', phone: '+1 (416) 921-4407' },
     ];
 
+    const menus = [
+      { id: 'm-std', name: 'Standard Shoot Day', items: ['Breakfast burritos', 'Fresh fruit + yogurt bar', 'Espresso + drip station', 'Hot lunch — protein + two sides', 'Afternoon substantials', 'Snack table restock'] },
+      { id: 'm-early', name: 'Early Call Breakfast', items: ['Egg + cheddar sandwiches', 'Overnight oats', 'Smoothie bar', 'Espresso + drip station', 'Late-morning pastry drop'] },
+      { id: 'm-wrap', name: 'Wrap Party', items: ['Souvlaki + pita station', 'Greek salad bowls', 'Loukoumades', 'Sparkling lemonade + iced coffee'] },
+    ];
+
     const invoices = [
       { id: 'inv-1', jobId: 'j-5', number: 'CR-2026-041', issuedOn: addDays(T, -12), dueOn: addDays(T, 18), status: 'sent', taxRate: 0.13 },
       { id: 'inv-2', jobId: 'j-4', number: 'CR-2026-042', issuedOn: addDays(T, -4), dueOn: addDays(T, 26), status: 'paid', taxRate: 0.13 },
@@ -147,7 +153,7 @@ const Store = (() => {
     return {
       v: 1,
       currentUserId: 'p-mar',
-      people, jobs, companies, invoices, timeOff, messages, notifications,
+      people, jobs, companies, menus, invoices, timeOff, messages, notifications,
       chatRead: {},
       settings: { ...DEFAULT_SETTINGS },
     };
@@ -156,7 +162,7 @@ const Store = (() => {
   function emptyState() {
     return {
       v: 1, currentUserId: null,
-      people: [], jobs: [], companies: [], invoices: [], timeOff: [], messages: [], notifications: [],
+      people: [], jobs: [], companies: [], menus: [], invoices: [], timeOff: [], messages: [], notifications: [],
       chatRead: {},
       settings: { ...DEFAULT_SETTINGS },
     };
@@ -206,7 +212,7 @@ const Store = (() => {
   }
 
   /* ---------- cloud boot ---------- */
-  const COLS = ['people', 'jobs', 'companies', 'invoices', 'timeOff', 'messages', 'notifications'];
+  const COLS = ['people', 'jobs', 'companies', 'menus', 'invoices', 'timeOff', 'messages', 'notifications'];
 
   async function enterCloud(user) {
     cloud = true;
@@ -543,6 +549,37 @@ const Store = (() => {
     save();
   }
 
+  /* ---------- menu templates ---------- */
+  const menuTpl = (id) => state.menus.find(m => m.id === id);
+
+  function upsertMenu(data) {
+    const existing = data.id && menuTpl(data.id);
+    if (existing) { Object.assign(existing, data); put('menus', existing); }
+    else {
+      data.id = 'm-' + uid();
+      state.menus.push(data);
+      put('menus', data);
+    }
+    save();
+    return data;
+  }
+
+  function deleteMenu(id) {
+    state.menus = state.menus.filter(m => m.id !== id);
+    del('menus', id);
+    save();
+  }
+
+  /* replace a job's menu with a copy of the given items (jobs keep their
+     own copy, so editing a template later never rewrites past jobs) */
+  function setJobMenu(jobId, items) {
+    const j = job(jobId);
+    if (!j) return;
+    j.menu = (items || []).slice();
+    put('jobs', j);
+    save();
+  }
+
   function upsertCompany(data) {
     const existing = data.id && company(data.id);
     if (existing) { Object.assign(existing, data); put('companies', existing); }
@@ -570,6 +607,10 @@ const Store = (() => {
     if (state.jobs.some(j => j.sample)) return false;
     const T = todayISO();
     const meP = me();
+
+    if (!state.menus.length) {
+      upsertMenu({ name: 'Standard Shoot Day', items: ['Breakfast burritos', 'Fresh fruit + yogurt bar', 'Espresso + drip station', 'Hot lunch — protein + two sides', 'Afternoon substantials'] });
+    }
 
     if (!companyByName('Bluewater Films')) {
       upsertCompany({
@@ -691,6 +732,7 @@ const Store = (() => {
     notify, myNotifications, markNotifsRead,
     upsertPerson, markInvoice, createInvoice, loadSampleData,
     company, companyByName, upsertCompany, deleteCompany,
+    menuTpl, upsertMenu, deleteMenu, setJobMenu,
     enterCloud, isCloud,
   };
 })();
