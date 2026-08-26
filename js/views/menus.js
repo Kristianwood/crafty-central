@@ -18,8 +18,10 @@ Views.menus = (() => {
     }
 
     const menus = Store.get().menus.slice().sort((a, b) => a.name.localeCompare(b.name));
+    const key = (items) => (items || []).join('|');
     const usedCount = (m) => Store.get().jobs.filter(j =>
-      j.menu.length && m.items.length && j.menu.join('|') === m.items.join('|')).length;
+      m.items.length && (key(j.menu) === key(m.items) ||
+        Object.values(j.dayInfo || {}).some(d => Array.isArray(d.menu) && key(d.menu) === key(m.items)))).length;
 
     el.innerHTML = `
       <div class="view-enter">

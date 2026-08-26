@@ -416,7 +416,7 @@ Views.dashboard = (() => {
           </div>
           ${Store.get().menus.length ? `
           <div class="field wide">
-            <label>Menu <span style="font-weight:400;color:var(--ink-3)">(from the menu library)</span></label>
+            <label>Menu <span style="font-weight:400;color:var(--ink-3)">(default for every shoot day — fine-tune per day on the job sheet)</span></label>
             <select name="menuTpl">
               <option value="">${j?.menu?.length ? `Keep current menu (${j.menu.length} items)` : 'Decide later'}</option>
               ${Store.get().menus.map(m => `<option value="${m.id}">${UI.esc(m.name)} — ${m.items.length} items</option>`).join('')}

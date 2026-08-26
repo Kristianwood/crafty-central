@@ -88,10 +88,13 @@ const UI = (() => {
   let panelJobId = null;
   let panelHideTimer = null;
   let panelDayIdx = 0;
+  let lastPanelDay = null; // activeDate at the previous render, for open-state restore
 
   function openJobPanel(jobId) {
     panelJobId = jobId;
     panelDayIdx = 0;
+    lastPanelDay = null;
+    document.getElementById('panelInner').innerHTML = ''; // fresh open-states for a new job
     renderPanel();
     const panel = document.getElementById('panel');
     const scrim = document.getElementById('panelScrim');
@@ -116,15 +119,38 @@ const UI = (() => {
     const j = Store.job(panelJobId);
     if (!j) { closeJobPanel(); return; }
     const inner = document.getElementById('panelInner');
-    // remember which dropdown sections were open before re-rendering
-    const openStates = [...inner.querySelectorAll('.miss-block')].map(d => d.open);
+    // remember which dropdown sections were open before re-rendering (by key)
+    const openStates = {};
+    inner.querySelectorAll('.miss-block[data-block]').forEach(d => { openStates[d.dataset.block] = d.open; });
     const canEdit = Store.can('editJob');
     const miss = Store.missing(j);
     const people = Store.get().people;
 
+    /* --- per-day context (multi-day jobs get tabs at the top) --- */
+    const multiDay = j.shootDays.length > 1;
+    if (panelDayIdx >= j.shootDays.length) panelDayIdx = 0;
+    const activeDate = j.shootDays[panelDayIdx] || j.shootDays[0];
+    const dv = (f) => Store.dayVal(j, activeDate, f);
+    const di = (j.dayInfo && j.dayInfo[activeDate]) || {};
+    const dayMenu = multiDay ? Store.menuFor(j, activeDate) : j.menu;
+    const dayHasMenuOverride = multiDay && Array.isArray(di.menu);
+    const menuDate = multiDay ? activeDate : null;
+
+    const dayTabs = !multiDay ? '' : `
+      <div class="day-tabs">
+        ${j.shootDays.map((d, i) => {
+          const info = j.dayInfo && j.dayInfo[d];
+          const needsMenu = !Store.menuFor(j, d).length;
+          return `
+          <button class="seg ${i === panelDayIdx ? 'active' : ''} ${needsMenu ? 'needs-menu' : (info && Object.keys(info).length ? 'has-info' : '')}" data-day-tab="${i}">
+            Day ${i + 1} <span class="seg-sub">${fmtShort(d)}</span>
+          </button>`;
+        }).join('')}
+      </div>`;
+
     /* --- missing-info dropdown blocks (top of panel) --- */
     const crewOpen = miss.includes('crew');
-    const menuOpen = miss.includes('menu');
+    const menuOpen = multiDay ? !dayMenu.length : miss.includes('menu');
 
     const canCrew = Store.can('assignCrew');
     const hasTimeOff = (pid) => Store.get().timeOff.some(t =>
@@ -132,7 +158,7 @@ const UI = (() => {
       j.shootDays.some(d => d >= t.start && d <= t.end));
 
     const crewBlock = `
-      <details class="miss-block ${crewOpen ? 'incomplete' : ''}" ${crewOpen ? 'open' : ''}>
+      <details class="miss-block ${crewOpen ? 'incomplete' : ''}" data-block="crew" ${crewOpen ? 'open' : ''}>
         <summary>
           <span class="ms-icon">${ICONS.people}</span>
           Crew on this job
@@ -170,21 +196,24 @@ const UI = (() => {
       </details>`;
 
     const menuBlock = `
-      <details class="miss-block ${menuOpen ? 'incomplete' : ''}" ${menuOpen ? 'open' : ''}>
+      <details class="miss-block ${miss.includes('menu') ? 'incomplete' : ''}" data-block="menu" ${menuOpen ? 'open' : ''}>
         <summary>
           <span class="ms-icon">${ICONS.menu}</span>
-          Menu
+          Menu${multiDay ? ` <span class="seg-sub">Day ${panelDayIdx + 1} · ${fmtShort(activeDate)}</span>` : ''}
           <span class="ms-state">
-            ${menuOpen
-              ? '<span class="missing-chip">' + ICONS.alert + 'Not set</span>'
-              : `<span class="pill neutral">${j.menu.length} item${j.menu.length === 1 ? '' : 's'}</span>`}
+            ${!dayMenu.length
+              ? '<span class="missing-chip">' + ICONS.alert + (multiDay ? `Day ${panelDayIdx + 1} not set` : 'Not set') + '</span>'
+              : `<span class="pill neutral">${dayMenu.length} item${dayMenu.length === 1 ? '' : 's'}</span>`}
             <span class="chev">${ICONS.chevDown}</span>
           </span>
         </summary>
         <div class="miss-body">
-          ${j.menu.length ? `<div class="tag-row">${j.menu.map((m, i) => `
+          ${multiDay ? `<p class="menu-scope-hint">${dayHasMenuOverride
+            ? `Custom menu for Day ${panelDayIdx + 1} — switch tabs above to set the other days.`
+            : `Using the job's default menu — any change here becomes Day ${panelDayIdx + 1}'s own menu.`}</p>` : ''}
+          ${dayMenu.length ? `<div class="tag-row">${dayMenu.map((m, i) => `
             <span class="tag">${esc(m)}${canEdit ? `<button data-menu-del="${i}" aria-label="Remove">${ICONS.x}</button>` : ''}</span>`).join('')}</div>`
-            : '<p style="font-size:12.5px;color:var(--ink-3);padding-top:8px">Nothing on the menu yet.</p>'}
+            : '<p style="font-size:12.5px;color:var(--ink-3);padding-top:8px">Nothing on the menu yet' + (multiDay ? ' for this day' : '') + '.</p>'}
           ${canEdit && Store.get().menus.length ? `
           <div class="menu-pick">
             <select id="menuTplSel" aria-label="Saved menu">
@@ -192,10 +221,11 @@ const UI = (() => {
               ${Store.get().menus.map(m => `<option value="${m.id}">${esc(m.name)} (${m.items.length})</option>`).join('')}
             </select>
             <button class="btn sm" id="menuTplApply" type="button">${ICONS.check} Apply</button>
-          </div>` : ''}
+          </div>
+          ${multiDay ? `<label class="menu-pick-all"><input type="checkbox" id="menuTplAll"> Apply to all ${j.shootDays.length} days (replaces each day's menu)</label>` : ''}` : ''}
           ${canEdit ? `
           <form class="tag-add" id="menuAddForm">
-            <input type="text" id="menuAddInput" placeholder="${j.menu.length ? 'Add an extra item…' : 'Or add items one by one…'}" autocomplete="off">
+            <input type="text" id="menuAddInput" placeholder="${dayMenu.length ? 'Add an extra item…' : 'Or add items one by one…'}" autocomplete="off">
             <button class="btn sm" type="submit">${ICONS.plus} Add</button>
           </form>` : ''}
         </div>
@@ -208,7 +238,7 @@ const UI = (() => {
       .map(p => `${esc(p.name.split(' ')[0])}: ${esc(p.dietary.join(', '))}`);
 
     const dietBlock = dietFlags.length ? `
-      <details class="miss-block">
+      <details class="miss-block" data-block="diet">
         <summary>
           <span class="ms-icon">${ICONS.alert}</span>
           Crew dietary notes
@@ -221,21 +251,10 @@ const UI = (() => {
 
     const sub = Store.jobSubtotal(j);
 
-    /* per-day tabs for multi-day jobs */
-    const multiDay = j.shootDays.length > 1;
-    if (panelDayIdx >= j.shootDays.length) panelDayIdx = 0;
-    const activeDate = j.shootDays[panelDayIdx];
-    const dv = (f) => Store.dayVal(j, activeDate, f);
-    const di = (j.dayInfo && j.dayInfo[activeDate]) || {};
-    const dayBlock = !multiDay ? '' : `
-      <div class="day-tabs">
-        ${j.shootDays.map((d, i) => `
-          <button class="seg ${i === panelDayIdx ? 'active' : ''} ${j.dayInfo && j.dayInfo[d] && Object.keys(j.dayInfo[d]).length ? 'has-info' : ''}" data-day-tab="${i}">
-            Day ${i + 1} <span class="seg-sub">${fmtShort(d)}</span>
-          </button>`).join('')}
-      </div>
+    /* schedule details for the active day (multi-day jobs) */
+    const dayCard = !multiDay ? '' : `
       <div class="day-card">
-        <div class="day-card-head">${fmtLong(activeDate)}${di && Object.keys(di).length ? '' : ' · using job defaults'}</div>
+        <div class="day-card-head">${fmtLong(activeDate)}${Object.keys(di).some(k => k !== 'menu' && di[k] !== '' && di[k] !== undefined && di[k] !== null) ? '' : ' · using job defaults'}</div>
         ${canEdit ? `
         <div class="day-form">
           <div class="field"><label>Call</label><input type="time" id="dayCall" value="${esc(dv('callTime') || '')}"></div>
@@ -264,13 +283,15 @@ const UI = (() => {
         <button class="panel-close" id="panelCloseBtn" aria-label="Close">${ICONS.x}</button>
       </div>
 
+      ${dayTabs}
+
       <div class="miss-stack">
         ${crewBlock}
         ${menuBlock}
         ${dietBlock}
       </div>
 
-      ${dayBlock}
+      ${dayCard}
 
       <div class="fact-grid">
         <div class="fact"><div class="f-label">Shoot days</div><div class="f-value mono">${esc(fmtDays(j.shootDays))}</div></div>
@@ -292,11 +313,14 @@ const UI = (() => {
       </div>
     `;
 
-    if (openStates.length) {
-      [...inner.querySelectorAll('.miss-block')].forEach((d, i) => {
-        if (openStates[i] !== undefined) d.open = openStates[i];
-      });
-    }
+    const dayChanged = lastPanelDay !== activeDate;
+    inner.querySelectorAll('.miss-block[data-block]').forEach(d => {
+      const key = d.dataset.block;
+      // switching day tabs recomputes the menu block's open state — keep it
+      if (key === 'menu' && dayChanged) return;
+      if (openStates[key] !== undefined) d.open = openStates[key];
+    });
+    lastPanelDay = activeDate;
 
     /* wire panel events */
     inner.querySelector('#panelCloseBtn').onclick = closeJobPanel;
@@ -358,9 +382,13 @@ const UI = (() => {
       const sel = inner.querySelector('#menuTplSel');
       const tpl = Store.menuTpl(sel.value);
       if (!tpl) return;
-      if (j.menu.length && !confirm(`Replace the ${j.menu.length} item${j.menu.length === 1 ? '' : 's'} on this job with the "${tpl.name}" menu?`)) return;
-      Store.setJobMenu(j.id, tpl.items);
-      toast(`"${tpl.name}" applied — ${tpl.items.length} items`, 'menu');
+      const allDays = !!inner.querySelector('#menuTplAll')?.checked;
+      const target = (multiDay && !allDays) ? activeDate : null;
+      const existing = target ? Store.menuFor(j, target).length : j.menu.length;
+      const scope = target ? `Day ${panelDayIdx + 1}` : (multiDay ? `all ${j.shootDays.length} days` : 'this job');
+      if ((existing || (!target && multiDay)) && !confirm(`Apply the "${tpl.name}" menu to ${scope}?${!target && multiDay ? ' Each day\u2019s own menu will be replaced.' : existing ? ` Its current ${existing} item${existing === 1 ? '' : 's'} will be replaced.` : ''}`)) return;
+      Store.setJobMenu(j.id, tpl.items, target);
+      toast(`"${tpl.name}" applied to ${scope}`, 'menu');
       renderPanel();
       App.refreshView();
     };
@@ -370,16 +398,16 @@ const UI = (() => {
       e.preventDefault();
       const inp = inner.querySelector('#menuAddInput');
       if (inp.value.trim()) {
-        Store.addMenuItem(j.id, inp.value);
+        Store.addMenuItem(j.id, inp.value, menuDate);
         renderPanel(); App.refreshView();
-        const d = inner.querySelectorAll('details')[1];
+        const d = inner.querySelector('.miss-block[data-block="menu"]');
         if (d) d.open = true;
       }
     };
     inner.querySelectorAll('[data-menu-del]').forEach(b => {
       b.onclick = (e) => {
         e.preventDefault();
-        Store.removeMenuItem(j.id, +b.dataset.menuDel);
+        Store.removeMenuItem(j.id, +b.dataset.menuDel, menuDate);
         renderPanel(); App.refreshView();
       };
     });

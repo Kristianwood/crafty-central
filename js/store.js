@@ -38,11 +38,32 @@ const Store = (() => {
      jobs: crew used to be an array of person ids — now [{role, personId}].
      people: tags (crew-role tags) may be missing on older docs; infer from
      their position text once, only when the field doesn't exist at all. */
+  /* Keep dayInfo consistent with shootDays: drop overrides for days that
+     no longer exist, and when a job shrinks to a single day, fold that
+     day's overrides back into the job-level fields so there is exactly
+     one source of truth for single-day jobs. */
+  function reconcileDays(j) {
+    j.dayInfo = j.dayInfo || {};
+    const days = j.shootDays || [];
+    Object.keys(j.dayInfo).forEach(d => { if (!days.includes(d)) delete j.dayInfo[d]; });
+    if (days.length === 1) {
+      const d = j.dayInfo[days[0]];
+      if (d) {
+        ['callTime', 'wrapTime', 'headcount', 'location'].forEach(f => {
+          if (d[f] !== undefined && d[f] !== '' && d[f] !== null) j[f] = d[f];
+        });
+        if (Array.isArray(d.menu)) j.menu = d.menu;
+        if (d.notes) j.notes = j.notes ? j.notes + ' — ' + d.notes : d.notes;
+        j.dayInfo = {};
+      }
+    }
+    return j;
+  }
+
   function normalizeJob(j) {
     j.crew = (j.crew || []).map(c =>
       typeof c === 'string' ? { role: 'Assist', personId: c } : c);
-    j.dayInfo = j.dayInfo || {}; // per-shoot-day overrides, keyed by ISO date
-    return j;
+    return reconcileDays(j);
   }
   function inferTags(position) {
     const p = (position || '').toLowerCase();
@@ -80,7 +101,7 @@ const Store = (() => {
         shootDays: [addDays(T, 1), addDays(T, 2)], callTime: '06:30', wrapTime: '19:00',
         status: 'confirmed', crew: [{ role: 'Key', personId: 'p-kei' }, { role: 'Chef', personId: 'p-roc' }, { role: 'Assist', personId: 'p-pri' }], menu: ['Breakfast burritos', 'Espresso bar', 'Harvest bowls', 'Afternoon snack table'],
         rates: { perHead: 34, truckDay: 850 }, notes: 'Client is nut-free across the board. Talent trailer needs a separate tray at 07:00.',
-        dayInfo: { [addDays(T, 2)]: { callTime: '08:30', headcount: 48, notes: 'Company move to Studio B — smaller unit.' } },
+        dayInfo: { [addDays(T, 2)]: { callTime: '08:30', headcount: 48, notes: 'Company move to Studio B — smaller unit.', menu: ['Egg + cheddar sandwiches', 'Espresso bar', 'Studio B hot lunch', 'Afternoon snack table'] } },
         createdAt: addDays(T, -12),
       },
       {
@@ -321,7 +342,9 @@ const Store = (() => {
   function missing(j) {
     const out = [];
     if (!j.crew.length) out.push('crew');
-    if (!j.menu.length) out.push('menu');
+    if (j.shootDays.length
+      ? j.shootDays.some(d => !menuFor(j, d).length)
+      : !j.menu.length) out.push('menu');
     if (!j.headcount) out.push('headcount');
     if (!j.location) out.push('location');
     if (!j.callTime) out.push('call time');
@@ -367,12 +390,14 @@ const Store = (() => {
     const existing = data.id && job(data.id);
     if (existing) {
       Object.assign(existing, data);
+      reconcileDays(existing);
       put('jobs', existing);
     } else {
       data.id = 'j-' + uid();
       data.createdAt = todayISO();
       data.crew = data.crew || [];
       data.menu = data.menu || [];
+      reconcileDays(data);
       state.jobs.push(data);
       put('jobs', data);
       notify('all', `New job created: ${data.productionName} (${fmtRange(data.shootDays[0], data.shootDays[data.shootDays.length - 1])}).`, 'briefcase');
@@ -433,13 +458,13 @@ const Store = (() => {
     return map;
   }
 
-  function addMenuItem(jobId, item) {
+  function addMenuItem(jobId, item, date) {
     const j = job(jobId);
-    if (j && item.trim()) { j.menu.push(item.trim()); put('jobs', j); save(); }
+    if (j && item.trim()) { dayMenuTarget(j, date).push(item.trim()); put('jobs', j); save(); }
   }
-  function removeMenuItem(jobId, idx) {
+  function removeMenuItem(jobId, idx, date) {
     const j = job(jobId);
-    if (j) { j.menu.splice(idx, 1); put('jobs', j); save(); }
+    if (j) { dayMenuTarget(j, date).splice(idx, 1); put('jobs', j); save(); }
   }
 
   function requestTimeOff(start, end, reason) {
@@ -606,12 +631,37 @@ const Store = (() => {
     save();
   }
 
-  /* replace a job's menu with a copy of the given items (jobs keep their
-     own copy, so editing a template later never rewrites past jobs) */
-  function setJobMenu(jobId, items) {
+  /* Effective menu for a given shoot day: the day's own menu if it has
+     one, otherwise the job-level default. */
+  function menuFor(j, date) {
+    const d = j.dayInfo && j.dayInfo[date];
+    return (d && Array.isArray(d.menu)) ? d.menu : j.menu;
+  }
+
+  /* The array to mutate for a date — copy-on-write from the job default,
+     so editing one day never bleeds into the others. */
+  function dayMenuTarget(j, date) {
+    if (!date) return j.menu;
+    j.dayInfo = j.dayInfo || {};
+    const d = j.dayInfo[date] = j.dayInfo[date] || {};
+    if (!Array.isArray(d.menu)) d.menu = j.menu.slice();
+    return d.menu;
+  }
+
+  /* Replace a menu with a copy of the given items. With a date, only that
+     day changes; without one, the job default is set and every per-day
+     menu override is cleared (all days back in sync). Jobs always keep
+     copies, so editing a template later never rewrites past jobs. */
+  function setJobMenu(jobId, items, date) {
     const j = job(jobId);
     if (!j) return;
-    j.menu = (items || []).slice();
+    if (date) {
+      j.dayInfo = j.dayInfo || {};
+      j.dayInfo[date] = { ...(j.dayInfo[date] || {}), menu: (items || []).slice() };
+    } else {
+      j.menu = (items || []).slice();
+      Object.values(j.dayInfo || {}).forEach(d => { delete d.menu; });
+    }
     put('jobs', j);
     save();
   }
@@ -730,6 +780,7 @@ const Store = (() => {
       status: 'confirmed',
       crew: [{ role: 'Key', personId: meP.id }],
       menu: ['Breakfast burritos', 'Espresso bar', 'Taco lunch', 'Afternoon snack table'],
+      dayInfo: { [addDays(T, 2)]: { menu: ['Overnight oats + fruit', 'Espresso bar', 'Souvlaki lunch', 'Wrap-day treat table'], notes: 'Day 2 menu is different — that is the per-day menus feature.' } },
       rates: { perHead: 34, truckDay: 850 },
       notes: 'Sample job — delete anytime. Client is nut-free; smoothie run at 3 PM.',
     });
@@ -828,7 +879,7 @@ const Store = (() => {
     notify, myNotifications, markNotifsRead,
     upsertPerson, markInvoice, createInvoice, loadSampleData,
     company, companyByName, upsertCompany, deleteCompany,
-    menuTpl, upsertMenu, deleteMenu, setJobMenu,
+    menuTpl, upsertMenu, deleteMenu, setJobMenu, menuFor,
     enterCloud, isCloud,
   };
 })();
