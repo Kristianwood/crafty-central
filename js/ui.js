@@ -287,7 +287,11 @@ const UI = (() => {
         <div>
           <div class="panel-kicker">${esc(j.productionCompany)}${j.agency ? ' · ' + esc(j.agency) : ''}</div>
           <h2 class="panel-title">${esc(j.productionName)}</h2>
-          <div class="panel-sub">${statusPill(j.status)}</div>
+          <div class="panel-sub">${canEdit && j.status !== 'invoiced' ? `
+            <select class="status-select ${j.status}" id="panelStatusSel" aria-label="Job status">
+              ${[['estimate', 'Hold'], ['confirmed', 'Confirmed'], ['wrapped', 'Wrapped']].map(([v, l]) =>
+                `<option value="${v}" ${j.status === v ? 'selected' : ''}>${l}</option>`).join('')}
+            </select>` : statusPill(j.status)}</div>
         </div>
         <button class="panel-close" id="panelCloseBtn" aria-label="Close">${ICONS.x}</button>
       </div>
@@ -316,6 +320,7 @@ const UI = (() => {
       </div>
 
       <div class="panel-actions">
+        ${canEdit && j.status === 'estimate' ? `<button class="btn primary" id="panelConfirmBtn">${ICONS.check} Confirm job</button>` : ''}
         ${canEdit ? `<button class="btn" id="panelEditBtn">${ICONS.edit} Edit job</button>` : ''}
         ${Store.can('finances') && j.status !== 'invoiced' ? `<button class="btn" id="panelInvoiceBtn">${ICONS.doc} Create invoice</button>` : ''}
         ${canEdit ? `<button class="btn danger" id="panelDeleteBtn">${ICONS.x} Delete</button>` : ''}
@@ -427,6 +432,19 @@ const UI = (() => {
         renderPanel(); App.refreshView();
       };
     });
+
+    const statusSel = inner.querySelector('#panelStatusSel');
+    if (statusSel) statusSel.onchange = () => {
+      Store.setJobStatus(j.id, statusSel.value);
+      toast(statusSel.value === 'confirmed' ? 'Confirmed — it\u2019s locked in on the calendar' : 'Status updated', 'check');
+      renderPanel(); App.refreshView(); App.refreshBadges();
+    };
+    const confirmBtn = inner.querySelector('#panelConfirmBtn');
+    if (confirmBtn) confirmBtn.onclick = () => {
+      Store.setJobStatus(j.id, 'confirmed');
+      toast('Confirmed — it\u2019s locked in on the calendar', 'check');
+      renderPanel(); App.refreshView(); App.refreshBadges();
+    };
 
     const editBtn = inner.querySelector('#panelEditBtn');
     if (editBtn) editBtn.onclick = () => Views.dashboard.openJobForm(j.id);

@@ -375,6 +375,28 @@ svg { display: block; }
 
 .pill.confirmed .pip { animation: pulse-dot 2.2s var(--ease) infinite; }
 
+/* Status dropdown (pill-styled, admins/moderators) */
+.status-select {
+  appearance: none;
+  -webkit-appearance: none;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .02em;
+  padding: 3px 22px 3px 10px;
+  min-height: 0;
+  width: auto;
+  cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%2351686e' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+}
+.status-select:focus { box-shadow: 0 0 0 3px rgba(14,124,134,.12); }
+.status-select.estimate { background-color: var(--amber-soft); color: var(--amber); }
+.status-select.confirmed { background-color: var(--green-soft); color: var(--green); }
+.status-select.wrapped { background-color: var(--blue-soft); color: var(--blue); }
+
 /* Missing info chips */
 .missing-chip {
   display: inline-flex;

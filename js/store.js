@@ -895,6 +895,18 @@ const Store = (() => {
     return true;
   }
 
+  function setJobStatus(jobId, status) {
+    const j = job(jobId);
+    if (!j || j.status === status) return;
+    const was = j.status;
+    j.status = status;
+    if (was === 'estimate' && status === 'confirmed') {
+      notify('all', `${j.productionName} is confirmed (${fmtRange(j.shootDays[0], j.shootDays[j.shootDays.length - 1])}).`, 'check');
+    }
+    put('jobs', j);
+    save();
+  }
+
   function markInvoice(id, status) {
     const inv = state.invoices.find(i => i.id === id);
     if (inv) { inv.status = status; put('invoices', inv); save(); }
@@ -930,7 +942,7 @@ const Store = (() => {
     newInquiries, convertInquiry, dismissInquiry,
     personJobs, personUpcomingDays, personBookedDays,
     jobSubtotal, invoiceTotal,
-    upsertJob, deleteJob, addMenuItem, removeMenuItem,
+    upsertJob, deleteJob, setJobStatus, addMenuItem, removeMenuItem,
     requestTimeOff, resolveTimeOff,
     chatWindowOpen, nextWindowOpen, dmChannel, sendMessage, releaseQueued, channelMessages, myChannels, unread, markRead,
     notify, myNotifications, markNotifsRead,

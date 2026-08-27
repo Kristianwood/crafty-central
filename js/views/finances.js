@@ -122,10 +122,7 @@ Views.finances = (() => {
     });
     el.querySelectorAll('[data-confirm-job]').forEach(b => b.onclick = (e) => {
       e.stopPropagation();
-      const j = Store.job(b.dataset.confirmJob);
-      j.status = 'confirmed';
-      Store.save();
-      Store.notify('all', `${j.productionName} is confirmed.`, 'check');
+      Store.setJobStatus(b.dataset.confirmJob, 'confirmed');
       UI.toast('Estimate confirmed — job is live', 'check');
       render(el); App.refreshBadges();
     });
