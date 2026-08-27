@@ -1,5 +1,5 @@
 /* Crafty Central — service worker: cache the app shell for offline + install */
-const CACHE = 'crafty-central-v7';
+const CACHE = 'crafty-central-v8';
 const SHELL = [
   '.',
   'index.html',
@@ -40,7 +40,7 @@ self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url);
   if (url.origin !== location.origin) return;
   e.respondWith(
-    fetch(e.request)
+    fetch(e.request, { cache: 'no-cache' }) // revalidate: never trust heuristic HTTP caching
       .then((res) => {
         const copy = res.clone();
         caches.open(CACHE).then((c) => c.put(e.request, copy));

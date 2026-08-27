@@ -53,6 +53,7 @@ const Store = (() => {
           if (d[f] !== undefined && d[f] !== '' && d[f] !== null) j[f] = d[f];
         });
         if (Array.isArray(d.menu)) j.menu = d.menu;
+        if (Array.isArray(d.crew)) j.crew = d.crew;
         if (d.notes) j.notes = j.notes ? j.notes + ' — ' + d.notes : d.notes;
         j.dayInfo = {};
       }
@@ -60,9 +61,14 @@ const Store = (() => {
     return j;
   }
 
+  const normCrewArr = (arr) => (arr || []).map(c =>
+    typeof c === 'string' ? { role: 'Assist', personId: c } : c);
+
   function normalizeJob(j) {
-    j.crew = (j.crew || []).map(c =>
-      typeof c === 'string' ? { role: 'Assist', personId: c } : c);
+    j.crew = normCrewArr(j.crew);
+    Object.values(j.dayInfo || {}).forEach(d => {
+      if (Array.isArray(d.crew)) d.crew = normCrewArr(d.crew);
+    });
     return reconcileDays(j);
   }
   function inferTags(position) {
@@ -101,7 +107,7 @@ const Store = (() => {
         shootDays: [addDays(T, 1), addDays(T, 2)], callTime: '06:30', wrapTime: '19:00',
         status: 'confirmed', crew: [{ role: 'Key', personId: 'p-kei' }, { role: 'Chef', personId: 'p-roc' }, { role: 'Assist', personId: 'p-pri' }], menu: ['Breakfast burritos', 'Espresso bar', 'Harvest bowls', 'Afternoon snack table'],
         rates: { perHead: 34, truckDay: 850 }, notes: 'Client is nut-free across the board. Talent trailer needs a separate tray at 07:00.',
-        dayInfo: { [addDays(T, 2)]: { callTime: '08:30', headcount: 48, notes: 'Company move to Studio B — smaller unit.', menu: ['Egg + cheddar sandwiches', 'Espresso bar', 'Studio B hot lunch', 'Afternoon snack table'] } },
+        dayInfo: { [addDays(T, 2)]: { callTime: '08:30', headcount: 48, notes: 'Company move to Studio B — smaller unit.', menu: ['Egg + cheddar sandwiches', 'Espresso bar', 'Studio B hot lunch', 'Afternoon snack table'], crew: [{ role: 'Key', personId: 'p-kei' }, { role: 'Chef', personId: 'p-sas' }, { role: 'Assist', personId: 'p-pri' }] } },
         createdAt: addDays(T, -12),
       },
       {
@@ -326,13 +332,38 @@ const Store = (() => {
     return !!map[perm];
   };
 
-  /* person ids booked on a job, regardless of role */
+  /* person ids in a crew array */
   const crewIds = (j) => j.crew.map(c => c.personId);
+
+  /* Effective crew for a shoot day: the day's own crew if it has one,
+     otherwise the job-level default (mirrors menuFor). */
+  function crewFor(j, date) {
+    const d = j.dayInfo && j.dayInfo[date];
+    return (d && Array.isArray(d.crew)) ? d.crew : j.crew;
+  }
+
+  /* Crew array to mutate for a date — copy-on-write from the job default */
+  function dayCrewTarget(j, date) {
+    if (!date) return j.crew;
+    j.dayInfo = j.dayInfo || {};
+    const d = j.dayInfo[date] = j.dayInfo[date] || {};
+    if (!Array.isArray(d.crew)) d.crew = j.crew.map(c => ({ ...c }));
+    return d.crew;
+  }
+
+  /* Everyone booked on the job on at least one day */
+  function allCrewIds(j) {
+    const days = j.shootDays || [];
+    if (!days.length) return crewIds(j);
+    const ids = new Set();
+    days.forEach(d => crewFor(j, d).forEach(c => ids.add(c.personId)));
+    return [...ids];
+  }
 
   function visibleJobs() {
     if (can('seeAllJobs')) return state.jobs.slice();
     const myId = me().id;
-    return state.jobs.filter(j => crewIds(j).includes(myId));
+    return state.jobs.filter(j => allCrewIds(j).includes(myId));
   }
 
   function jobsOn(isoDate, jobsList) {
@@ -341,7 +372,9 @@ const Store = (() => {
 
   function missing(j) {
     const out = [];
-    if (!j.crew.length) out.push('crew');
+    if (j.shootDays.length
+      ? j.shootDays.some(d => !crewFor(j, d).length)
+      : !j.crew.length) out.push('crew');
     if (j.shootDays.length
       ? j.shootDays.some(d => !menuFor(j, d).length)
       : !j.menu.length) out.push('menu');
@@ -414,47 +447,71 @@ const Store = (() => {
     save();
   }
 
-  function addCrew(jobId, roleTag, personId) {
+  /* Add someone to the crew. With a date: that day only (copy-on-write).
+     Without a date: the job default AND every day that already has its
+     own crew list — i.e. genuinely all days. */
+  function addCrew(jobId, roleTag, personId, date) {
     const j = job(jobId);
-    if (!j || !personId || crewIds(j).includes(personId)) return;
-    j.crew.push({ role: roleTag, personId });
-    notify('person:' + personId, `You were added to ${j.productionName} as ${roleTag} (${fmtRange(j.shootDays[0], j.shootDays[j.shootDays.length - 1])}).`, 'briefcase');
+    if (!j || !personId) return;
+    if (date) {
+      const target = dayCrewTarget(j, date);
+      if (target.some(c => c.personId === personId)) return;
+      target.push({ role: roleTag, personId });
+      notify('person:' + personId, `You were added to ${j.productionName} as ${roleTag} for ${fmtShort(date)}.`, 'briefcase');
+    } else {
+      if (!j.crew.some(c => c.personId === personId)) j.crew.push({ role: roleTag, personId });
+      Object.values(j.dayInfo || {}).forEach(d => {
+        if (Array.isArray(d.crew) && !d.crew.some(c => c.personId === personId)) {
+          d.crew.push({ role: roleTag, personId });
+        }
+      });
+      notify('person:' + personId, `You were added to ${j.productionName} as ${roleTag} (${fmtRange(j.shootDays[0], j.shootDays[j.shootDays.length - 1])}).`, 'briefcase');
+    }
     put('jobs', j);
     save();
   }
-  function removeCrew(jobId, idx) {
+  function removeCrew(jobId, idx, date) {
     const j = job(jobId);
-    if (!j || !j.crew[idx]) return;
-    j.crew.splice(idx, 1);
+    if (!j) return;
+    const current = date ? crewFor(j, date) : j.crew;
+    if (!current[idx]) return; // validate BEFORE any copy-on-write side effect
+    const target = date ? dayCrewTarget(j, date) : j.crew;
+    target.splice(idx, 1);
     put('jobs', j);
     save();
   }
 
-  /* people tagged for a crew role, excluding anyone already on the job */
-  function candidatesFor(jobId, roleTag) {
+  /* people tagged for a crew role, excluding anyone already booked on
+     the target scope (a specific day, or anywhere on the job) */
+  function candidatesFor(jobId, roleTag, date) {
     const j = job(jobId);
-    const taken = j ? crewIds(j) : [];
+    const taken = !j ? [] : (date ? crewFor(j, date).map(c => c.personId) : allCrewIds(j));
     return state.people.filter(p =>
       (p.tags || []).includes(roleTag) && !taken.includes(p.id));
   }
 
-  /* ---------- crew workload ---------- */
+  /* ---------- crew workload (day-accurate) ---------- */
   function personJobs(personId) {
     return state.jobs
-      .filter(j => crewIds(j).includes(personId))
+      .filter(j => allCrewIds(j).includes(personId))
       .sort((a, b) => a.shootDays[0].localeCompare(b.shootDays[0]));
   }
-  /* upcoming booked days (today onward) for the workload list */
+  const personOnDay = (j, personId, d) => crewFor(j, d).some(c => c.personId === personId);
+  /* upcoming booked days (today onward) — only days the person actually works */
   function personUpcomingDays(personId) {
     const T = todayISO();
     const days = new Set();
-    personJobs(personId).forEach(j => j.shootDays.forEach(d => { if (d >= T) days.add(d); }));
+    personJobs(personId).forEach(j => j.shootDays.forEach(d => {
+      if (d >= T && personOnDay(j, personId, d)) days.add(d);
+    }));
     return days.size;
   }
   /* date -> job map for the mini calendar */
   function personBookedDays(personId) {
     const map = {};
-    personJobs(personId).forEach(j => j.shootDays.forEach(d => { map[d] = j; }));
+    personJobs(personId).forEach(j => j.shootDays.forEach(d => {
+      if (personOnDay(j, personId, d)) map[d] = j;
+    }));
     return map;
   }
 
@@ -867,7 +924,7 @@ const Store = (() => {
     iso, todayISO, addDays,
     me, person, job, role, can, setUser,
     visibleJobs, jobsOn, missing,
-    CREW_ROLES, DIETARY, crewIds, addCrew, removeCrew, candidatesFor,
+    CREW_ROLES, DIETARY, crewIds, crewFor, allCrewIds, addCrew, removeCrew, candidatesFor,
     dayVal, setDayInfo, totalCovers,
     setCrewMember, upsertSetCrew, deleteSetCrew,
     newInquiries, convertInquiry, dismissInquiry,

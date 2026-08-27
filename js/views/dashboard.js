@@ -161,8 +161,8 @@ Views.dashboard = (() => {
       <div class="workload-list">
         ${people.map(p => {
           const days = Store.personUpcomingDays(p.id);
-          const nextJob = Store.personJobs(p.id).find(j => j.shootDays.some(d => d >= Store.todayISO()));
-          const nextDay = nextJob ? nextJob.shootDays.find(d => d >= Store.todayISO()) : null;
+          const nextDay = Object.keys(Store.personBookedDays(p.id)).sort()
+            .find(d => d >= Store.todayISO()) || null;
           return `
           <div class="workload-row" data-person-sched="${p.id}">
             ${UI.avatar(p, 'sm')}
@@ -234,21 +234,29 @@ Views.dashboard = (() => {
   function schedListHTML(p) {
     const T = Store.todayISO();
     const jobs = Store.personJobs(p.id);
-    const roleOn = (j) => (j.crew.find(c => c.personId === p.id) || {}).role || '';
-    const upcoming = jobs.filter(j => j.shootDays[j.shootDays.length - 1] >= T);
-    const past = jobs.filter(j => j.shootDays[j.shootDays.length - 1] < T).reverse();
+    const pDays = (j) => j.shootDays.filter(d => Store.crewFor(j, d).some(c => c.personId === p.id));
+    const roleOn = (j) => {
+      for (const d of j.shootDays) {
+        const hit = Store.crewFor(j, d).find(c => c.personId === p.id);
+        if (hit) return hit.role;
+      }
+      return (j.crew.find(c => c.personId === p.id) || {}).role || '';
+    };
+    const lastOwnDay = (j) => { const d = pDays(j); return d.length ? d[d.length - 1] : ''; };
+    const upcoming = jobs.filter(j => lastOwnDay(j) >= T);
+    const past = jobs.filter(j => lastOwnDay(j) < T).reverse();
     const offs = Store.get().timeOff.filter(t => t.personId === p.id && t.status === 'approved' && t.end >= T);
 
-    const row = (j) => `
+    const row = (j) => { const d = pDays(j); return `
       <div class="sched-mini-row" data-open-job="${j.id}">
-        <span class="smr-dates">${UI.esc(UI.fmtRange(j.shootDays[0], j.shootDays[j.shootDays.length - 1]))}</span>
+        <span class="smr-dates">${UI.esc(UI.fmtRange(d[0] || j.shootDays[0], d[d.length - 1] || j.shootDays[j.shootDays.length - 1]))}</span>
         <div class="smr-main">
           <span class="smr-name">${UI.esc(j.productionName)}</span>
           <span class="smr-sub">Call ${UI.fmtTime12(j.callTime)} · ${UI.esc((j.location || '—').split(',')[0])}</span>
         </div>
         <span class="crew-role-tag">${UI.esc(roleOn(j))}</span>
         ${UI.statusPill(j.status)}
-      </div>`;
+      </div>`; };
 
     if (!upcoming.length && !past.length && !offs.length) {
       return `<div class="empty" style="margin-top:14px">${ICONS.schedule}
@@ -335,7 +343,7 @@ Views.dashboard = (() => {
           </div>
         </div>
         <div class="job-side">
-          ${j.crew.length ? UI.avatarStack(Store.crewIds(j)) : ''}
+          ${UI.avatarStack(Store.allCrewIds(j))}
           ${UI.statusPill(j.status)}
         </div>
       </div>`;

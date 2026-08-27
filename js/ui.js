@@ -123,6 +123,7 @@ const UI = (() => {
     // remember which dropdown sections were open before re-rendering (by key)
     const openStates = {};
     inner.querySelectorAll('.miss-block[data-block]').forEach(d => { openStates[d.dataset.block] = d.open; });
+    const prevAllDays = inner.querySelector('#crewAllDays')?.checked;
     const canEdit = Store.can('editJob');
     const miss = Store.missing(j);
     const people = Store.get().people;
@@ -136,12 +137,15 @@ const UI = (() => {
     const dayMenu = multiDay ? Store.menuFor(j, activeDate) : j.menu;
     const dayHasMenuOverride = multiDay && Array.isArray(di.menu);
     const menuDate = multiDay ? activeDate : null;
+    const dayCrew = multiDay ? Store.crewFor(j, activeDate) : j.crew;
+    const dayHasCrewOverride = multiDay && Array.isArray(di.crew);
+    const crewDate = multiDay ? activeDate : null;
 
     const dayTabs = !multiDay ? '' : `
       <div class="day-tabs">
         ${j.shootDays.map((d, i) => {
           const info = j.dayInfo && j.dayInfo[d];
-          const needsMenu = !Store.menuFor(j, d).length;
+          const needsMenu = !Store.menuFor(j, d).length || !Store.crewFor(j, d).length;
           return `
           <button class="seg ${i === panelDayIdx ? 'active' : ''} ${needsMenu ? 'needs-menu' : (info && Object.keys(info).length ? 'has-info' : '')}" data-day-tab="${i}">
             Day ${i + 1} <span class="seg-sub">${fmtShort(d)}</span>
@@ -150,29 +154,32 @@ const UI = (() => {
       </div>`;
 
     /* --- missing-info dropdown blocks (top of panel) --- */
-    const crewOpen = miss.includes('crew');
+    const crewOpen = multiDay ? !dayCrew.length : miss.includes('crew');
     const menuOpen = multiDay ? !dayMenu.length : miss.includes('menu');
 
     const canCrew = Store.can('assignCrew');
-    const hasTimeOff = (pid) => Store.get().timeOff.some(t =>
+    const hasTimeOff = (pid, days) => Store.get().timeOff.some(t =>
       t.personId === pid && t.status !== 'denied' &&
-      j.shootDays.some(d => d >= t.start && d <= t.end));
+      (days || j.shootDays).some(d => d >= t.start && d <= t.end));
 
     const crewBlock = `
-      <details class="miss-block ${crewOpen ? 'incomplete' : ''}" data-block="crew" ${crewOpen ? 'open' : ''}>
+      <details class="miss-block ${miss.includes('crew') ? 'incomplete' : ''}" data-block="crew" ${crewOpen ? 'open' : ''}>
         <summary>
           <span class="ms-icon">${ICONS.people}</span>
-          Crew on this job
+          Crew${multiDay ? ` <span class="seg-sub">Day ${panelDayIdx + 1} · ${fmtShort(activeDate)}</span>` : ' on this job'}
           <span class="ms-state">
-            ${crewOpen
-              ? '<span class="missing-chip">' + ICONS.alert + 'None assigned</span>'
-              : avatarStack(Store.crewIds(j), 5)}
+            ${!dayCrew.length
+              ? '<span class="missing-chip">' + ICONS.alert + (multiDay ? `Day ${panelDayIdx + 1} — nobody` : 'None assigned') + '</span>'
+              : avatarStack(dayCrew.map(c => c.personId), 5)}
             <span class="chev">${ICONS.chevDown}</span>
           </span>
         </summary>
         <div class="miss-body">
-          ${j.crew.length ? `<div class="check-list">
-            ${j.crew.map((c, i) => {
+          ${multiDay ? `<p class="menu-scope-hint">${dayHasCrewOverride
+            ? `Custom crew for Day ${panelDayIdx + 1} — switch tabs above for the other days.`
+            : `Using the job's default crew — removing someone here only changes Day ${panelDayIdx + 1}.`}</p>` : ''}
+          ${dayCrew.length ? `<div class="check-list">
+            ${dayCrew.map((c, i) => {
               const p = Store.person(c.personId);
               if (!p) return '';
               return `
@@ -180,11 +187,11 @@ const UI = (() => {
                 <span class="crew-role-tag">${esc(c.role)}</span>
                 ${avatar(p, 'sm')}
                 <span>${esc(p.name)}</span>
-                <span class="ci-sub">${hasTimeOff(p.id) ? '<span class="pill warn">Time off</span>' : esc(p.position)}</span>
-                ${canCrew ? `<button class="crew-remove" data-crew-del="${i}" aria-label="Remove ${esc(p.name)}">${ICONS.x}</button>` : ''}
+                <span class="ci-sub">${hasTimeOff(p.id, multiDay ? [activeDate] : null) ? '<span class="pill warn">Time off</span>' : esc(p.position)}</span>
+                ${canCrew ? `<button class="crew-remove" data-crew-del="${i}" aria-label="Remove ${esc(p.name)}${multiDay ? ` from Day ${panelDayIdx + 1}` : ''}" title="Remove${multiDay ? ` from Day ${panelDayIdx + 1}` : ''}">${ICONS.x}</button>` : ''}
               </div>`;
             }).join('')}
-          </div>` : '<p style="font-size:12.5px;color:var(--ink-3);padding-top:8px">Nobody booked yet.</p>'}
+          </div>` : `<p style="font-size:12.5px;color:var(--ink-3);padding-top:8px">Nobody booked${multiDay ? ' for this day' : ''} yet.</p>`}
           ${canCrew ? `
           <div class="crew-add">
             <select id="crewRoleSel" aria-label="Role">
@@ -192,7 +199,8 @@ const UI = (() => {
             </select>
             <select id="crewPersonSel" aria-label="Person"></select>
             <button class="btn sm" id="crewAddBtn" type="button">${ICONS.plus} Add</button>
-          </div>` : ''}
+          </div>
+          ${multiDay ? `<label class="menu-pick-all"><input type="checkbox" id="crewAllDays" checked> Book for all ${j.shootDays.length} days (uncheck for Day ${panelDayIdx + 1} only)</label>` : ''}` : ''}
         </div>
       </details>`;
 
@@ -233,7 +241,7 @@ const UI = (() => {
       </details>`;
 
     /* dietary flags for the assigned crew + headcount note */
-    const dietFlags = Store.crewIds(j)
+    const dietFlags = dayCrew.map(c => c.personId)
       .map(id => Store.person(id))
       .filter(p => p && p.dietary.length)
       .map(p => `${esc(p.name.split(' ')[0])}: ${esc(p.dietary.join(', '))}`);
@@ -317,10 +325,12 @@ const UI = (() => {
     const dayChanged = lastPanelDay !== activeDate;
     inner.querySelectorAll('.miss-block[data-block]').forEach(d => {
       const key = d.dataset.block;
-      // switching day tabs recomputes the menu block's open state — keep it
-      if (key === 'menu' && dayChanged) return;
+      // switching day tabs recomputes these blocks' open state — keep it
+      if ((key === 'menu' || key === 'crew') && dayChanged) return;
       if (openStates[key] !== undefined) d.open = openStates[key];
     });
+    const allDaysEl = inner.querySelector('#crewAllDays');
+    if (allDaysEl && prevAllDays !== undefined && !dayChanged) allDaysEl.checked = prevAllDays;
     lastPanelDay = activeDate;
 
     /* wire panel events */
@@ -347,11 +357,14 @@ const UI = (() => {
     const roleSel = inner.querySelector('#crewRoleSel');
     const personSel = inner.querySelector('#crewPersonSel');
     if (roleSel && personSel) {
+      const allDaysChk = inner.querySelector('#crewAllDays');
+      const addScopeDate = () => (multiDay && allDaysChk && !allDaysChk.checked) ? activeDate : null;
+      const scopeDays = () => addScopeDate() ? [addScopeDate()] : j.shootDays;
       const fillPeople = () => {
-        const cands = Store.candidatesFor(j.id, roleSel.value);
+        const cands = Store.candidatesFor(j.id, roleSel.value, addScopeDate());
         personSel.innerHTML = cands.length
           ? cands.map(p => {
-              const off = hasTimeOff(p.id);
+              const off = hasTimeOff(p.id, scopeDays());
               return `<option value="${p.id}">${esc(p.name)}${off ? ' — time off' : ''}</option>`;
             }).join('')
           : '<option value="">No one tagged ' + esc(roleSel.value) + '</option>';
@@ -359,20 +372,22 @@ const UI = (() => {
         inner.querySelector('#crewAddBtn').disabled = !cands.length;
       };
       roleSel.onchange = fillPeople;
+      if (allDaysChk) allDaysChk.onchange = fillPeople;
       fillPeople();
       inner.querySelector('#crewAddBtn').onclick = () => {
         if (!personSel.value) return;
         const p = Store.person(personSel.value);
-        if (hasTimeOff(p.id) && !confirm(`${p.name} has time off during this shoot. Book them anyway?`)) return;
-        Store.addCrew(j.id, roleSel.value, personSel.value);
-        toast(`${p.name.split(' ')[0]} added as ${roleSel.value}`, 'people');
+        const date = addScopeDate();
+        if (hasTimeOff(p.id, scopeDays()) && !confirm(`${p.name} has time off during ${date ? 'that day' : 'this shoot'}. Book them anyway?`)) return;
+        Store.addCrew(j.id, roleSel.value, personSel.value, date);
+        toast(`${p.name.split(' ')[0]} added as ${roleSel.value}${date ? ` — Day ${panelDayIdx + 1} only` : (multiDay ? ' — all days' : '')}`, 'people');
         renderPanel();
         App.refreshView();
       };
     }
     inner.querySelectorAll('[data-crew-del]').forEach(b => {
       b.onclick = () => {
-        Store.removeCrew(j.id, +b.dataset.crewDel);
+        Store.removeCrew(j.id, +b.dataset.crewDel, crewDate);
         renderPanel();
         App.refreshView();
       };

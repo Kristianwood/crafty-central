@@ -11,13 +11,16 @@ Views.schedule = (() => {
   function render(el) {
     const meP = Store.me();
     const T = Store.todayISO();
+    const myDays = (j) => j.shootDays.filter(d => Store.crewFor(j, d).some(c => c.personId === meP.id));
     const mine = Store.get().jobs
-      .filter(j => Store.crewIds(j).includes(meP.id))
+      .filter(j => myDays(j).length)
       .sort((a, b) => a.shootDays[0].localeCompare(b.shootDays[0]));
-    const upcoming = mine.filter(j => j.shootDays[j.shootDays.length - 1] >= T);
-    const past = mine.filter(j => j.shootDays[j.shootDays.length - 1] < T).reverse();
+    const lastMyDay = (j) => { const d = myDays(j); return d[d.length - 1]; };
+    const upcoming = mine.filter(j => lastMyDay(j) >= T);
+    const past = mine.filter(j => lastMyDay(j) < T).reverse();
     const myTO = Store.get().timeOff.filter(t => t.personId === meP.id).slice().reverse();
 
+    const myJobRowBound = (j, i) => myJobRow(j, i, myDays(j));
     el.innerHTML = `
       <div class="view-enter sched-split">
         <div>
@@ -27,7 +30,7 @@ Views.schedule = (() => {
               <div class="section-hint">Call times and locations for everything you're booked on.</div>
             </div>
           </div>
-          ${upcoming.length ? `<div class="job-strip stagger">${upcoming.map((j, i) => myJobRow(j, i)).join('')}</div>` : `
+          ${upcoming.length ? `<div class="job-strip stagger">${upcoming.map((j, i) => myJobRowBound(j, i)).join('')}</div>` : `
             <div class="empty">
               ${ICONS.schedule}
               <div class="e-title">Nothing booked yet</div>
@@ -36,7 +39,7 @@ Views.schedule = (() => {
 
           ${past.length ? `
           <div class="section-head"><div class="section-title">Recent</div></div>
-          <div class="job-strip" style="opacity:.62">${past.slice(0, 4).map((j, i) => myJobRow(j, i)).join('')}</div>` : ''}
+          <div class="job-strip" style="opacity:.62">${past.slice(0, 4).map((j, i) => myJobRowBound(j, i)).join('')}</div>` : ''}
         </div>
 
         <div class="timeoff-card">
@@ -88,16 +91,17 @@ Views.schedule = (() => {
     };
   }
 
-  function myJobRow(j, i) {
-    const first = j.shootDays.find(d => d >= Store.todayISO()) || j.shootDays[0];
+  function myJobRow(j, i, days) {
+    days = days && days.length ? days : j.shootDays;
+    const first = days.find(d => d >= Store.todayISO()) || days[0];
     const d = new Date(first + 'T00:00:00');
-    const myRole = (j.crew.find(c => c.personId === Store.me().id) || {}).role;
+    const myRole = (Store.crewFor(j, first).find(c => c.personId === Store.me().id) || {}).role;
     return `
       <div class="job-row" data-open-job="${j.id}" data-open-day="${first}" style="--i:${i}">
         <div class="job-date">
           <span class="d-mon">${d.toLocaleDateString('en-CA', { month: 'short' })}</span>
           <span class="d-day">${d.getDate()}</span>
-          <span class="d-wk">${d.toLocaleDateString('en-CA', { weekday: 'short' })}${j.shootDays.length > 1 ? ` +${j.shootDays.length - 1}` : ''}</span>
+          <span class="d-wk">${d.toLocaleDateString('en-CA', { weekday: 'short' })}${days.length > 1 ? ` +${days.length - 1}` : ''}</span>
         </div>
         <div class="job-main">
           <div class="job-name">${UI.esc(j.productionName)}${myRole ? ` <span class="crew-role-tag">${UI.esc(myRole)}</span>` : ''}</div>

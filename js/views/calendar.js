@@ -61,7 +61,7 @@ Views.calendar = (() => {
               ${dayJobs.map(j => {
                 const dayNum = j.shootDays.indexOf(dISO) + 1;
                 const multi = j.shootDays.length > 1;
-                const dayNeeds = Store.missing(j).some(m => m !== 'menu') || !Store.menuFor(j, dISO).length;
+                const dayNeeds = Store.missing(j).some(m => m !== 'menu' && m !== 'crew') || !Store.menuFor(j, dISO).length || !Store.crewFor(j, dISO).length;
                 return `<button class="cal-job ${j.status}" data-job="${j.id}" data-date="${dISO}" title="${UI.esc(j.productionName)}${multi ? ` — Day ${dayNum} of ${j.shootDays.length}` : ''}">${dayNeeds ? '<span class="cj-miss"></span>' : ''}${multi ? `<span class="cj-daynum">${dayNum}/${j.shootDays.length}</span>` : ''}${UI.esc(j.productionName)}</button>`;
               }).join('')}
               ${dayTO.map(t => {
