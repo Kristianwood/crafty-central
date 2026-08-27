@@ -59,8 +59,10 @@ Views.calendar = (() => {
             <div class="cal-cell ${other ? 'other' : ''} ${dISO === T ? 'today' : ''}">
               <span class="c-num">${d.getDate()}</span>
               ${dayJobs.map(j => {
-                const miss = Store.missing(j).length;
-                return `<button class="cal-job ${j.status}" data-job="${j.id}" title="${UI.esc(j.productionName)}">${miss ? '<span class="cj-miss"></span>' : ''}${UI.esc(j.productionName)}</button>`;
+                const dayNum = j.shootDays.indexOf(dISO) + 1;
+                const multi = j.shootDays.length > 1;
+                const dayNeeds = Store.missing(j).some(m => m !== 'menu') || !Store.menuFor(j, dISO).length;
+                return `<button class="cal-job ${j.status}" data-job="${j.id}" data-date="${dISO}" title="${UI.esc(j.productionName)}${multi ? ` — Day ${dayNum} of ${j.shootDays.length}` : ''}">${dayNeeds ? '<span class="cj-miss"></span>' : ''}${multi ? `<span class="cj-daynum">${dayNum}/${j.shootDays.length}</span>` : ''}${UI.esc(j.productionName)}</button>`;
               }).join('')}
               ${dayTO.map(t => {
                 const p = Store.person(t.personId);
@@ -86,7 +88,7 @@ Views.calendar = (() => {
     if (nj) nj.onclick = () => Views.dashboard.openJobForm();
 
     el.querySelectorAll('[data-job]').forEach(b => {
-      b.onclick = () => UI.openJobPanel(b.dataset.job);
+      b.onclick = () => UI.openJobPanel(b.dataset.job, b.dataset.date);
     });
   }
 

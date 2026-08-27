@@ -484,6 +484,13 @@ svg { display: block; }
 .cal-job.wrapped { background: var(--blue-soft); color: var(--blue); border-left-color: var(--blue); }
 .cal-job.timeoff { background: var(--bg); color: var(--ink-2); border-left-color: var(--ink-3); font-weight: 500; }
 .cal-job.selected { outline: 2px solid var(--accent); outline-offset: 1px; }
+.cal-job .cj-daynum {
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 700;
+  opacity: .72;
+  margin-right: 4px;
+}
 .cal-job .cj-miss {
   display: inline-block;
   width: 6px; height: 6px;

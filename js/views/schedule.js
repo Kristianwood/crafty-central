@@ -72,7 +72,7 @@ Views.schedule = (() => {
       </div>`;
 
     el.querySelectorAll('[data-open-job]').forEach(r => {
-      r.onclick = () => UI.openJobPanel(r.dataset.openJob);
+      r.onclick = () => UI.openJobPanel(r.dataset.openJob, r.dataset.openDay);
     });
 
     el.querySelector('#toForm').onsubmit = (e) => {
@@ -93,7 +93,7 @@ Views.schedule = (() => {
     const d = new Date(first + 'T00:00:00');
     const myRole = (j.crew.find(c => c.personId === Store.me().id) || {}).role;
     return `
-      <div class="job-row" data-open-job="${j.id}" style="--i:${i}">
+      <div class="job-row" data-open-job="${j.id}" data-open-day="${first}" style="--i:${i}">
         <div class="job-date">
           <span class="d-mon">${d.toLocaleDateString('en-CA', { month: 'short' })}</span>
           <span class="d-day">${d.getDate()}</span>

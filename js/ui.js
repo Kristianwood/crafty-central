@@ -90,9 +90,10 @@ const UI = (() => {
   let panelDayIdx = 0;
   let lastPanelDay = null; // activeDate at the previous render, for open-state restore
 
-  function openJobPanel(jobId) {
+  function openJobPanel(jobId, date) {
     panelJobId = jobId;
-    panelDayIdx = 0;
+    const j = Store.job(jobId);
+    panelDayIdx = (date && j) ? Math.max(0, j.shootDays.indexOf(date)) : 0;
     lastPanelDay = null;
     document.getElementById('panelInner').innerHTML = ''; // fresh open-states for a new job
     renderPanel();
