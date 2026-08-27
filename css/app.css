@@ -1888,10 +1888,22 @@ textarea { border-radius: 20px; background: var(--card); }
   .workload-list { grid-template-columns: 1fr; }
   .workload-row { grid-template-columns: auto 1fr auto; }
   .topbar-title { font-size: 21px; }
+  /* Locked app shell: the body never scrolls on mobile — content scrolls
+     inside .main-col — so the bottom nav physically cannot ride up with
+     the page (iOS position:fixed drifts during scroll otherwise). */
+  html, body { height: 100%; overflow: hidden; }
+  .app { height: 100dvh; overflow: hidden; }
+  .main-col {
+    height: 100dvh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-y: contain;
+  }
   .sidebar {
     border-top: 1px solid var(--line-soft);
     padding: 6px 8px calc(6px + env(safe-area-inset-bottom));
     background: rgba(236, 227, 208, .94);
+    z-index: 45;
   }
   .topbar { padding: 12px 16px 8px; }
   .chat-side { padding: 8px; }
@@ -1958,3 +1970,38 @@ textarea { border-radius: 20px; background: var(--card); }
   .bh-time { font-size: 44px; }
   .brief-days { max-width: 100%; order: 3; }
 }
+
+
+/* ============ Day view (calendar day sheet) ============ */
+
+.cal-cell[data-day] { cursor: pointer; transition: box-shadow .15s var(--ease); }
+.cal-cell[data-day]:hover { box-shadow: 0 3px 10px rgba(46,43,37,.14); }
+.cal-cell.today[data-day]:hover { box-shadow: inset 0 0 0 2px var(--accent), 0 3px 10px rgba(46,43,37,.14); }
+.cal-more {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--ink-2);
+  background: var(--surface);
+  border-radius: 999px;
+  padding: 4px 9px;
+  text-align: left;
+  width: fit-content;
+}
+.cal-more:hover { background: var(--line); }
+
+.dp-list { display: flex; flex-direction: column; gap: 12px; margin-top: 16px; }
+.dp-job { background: var(--card); border-radius: 22px; padding: 16px 18px 16px; }
+.dp-job-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.dp-name { font-family: var(--display); font-size: 17px; line-height: 1.2; }
+.dp-co { font-size: 12px; color: var(--ink-3); margin-top: 3px; font-weight: 500; }
+.dp-meta { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-top: 12px; font-size: 12.5px; font-weight: 500; color: var(--ink-2); }
+.dp-meta span { display: inline-flex; align-items: center; gap: 6px; }
+.dp-meta svg { width: 13px; height: 13px; color: var(--ink-3); }
+.dp-gap { color: var(--red-ink); font-weight: 700; }
+.dp-crew { margin-top: 12px; }
+.dp-actions { display: flex; gap: 8px; margin-top: 14px; }
+.dp-off-wrap { background: var(--card); border-radius: 22px; padding: 14px 18px 16px; }
+.dp-off-title { font-size: 10.5px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3); margin-bottom: 10px; }
+.dp-off { display: flex; align-items: center; gap: 10px; font-size: 13px; padding: 5px 0; }
+.dp-off b { font-weight: 700; }
+.dp-off span:last-child { color: var(--ink-3); font-size: 12px; }

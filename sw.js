@@ -1,5 +1,5 @@
 /* Crafty Central — service worker: cache the app shell for offline + install */
-const CACHE = 'crafty-central-v10';
+const CACHE = 'crafty-central-v11';
 const SHELL = [
   '.',
   'index.html',

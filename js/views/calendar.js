@@ -55,19 +55,25 @@ Views.calendar = (() => {
             const other = d.getMonth() !== cursor.m;
             const dayJobs = jobs.filter(j => j.shootDays.includes(dISO));
             const dayTO = canSeeTO ? timeOff.filter(t => dISO >= t.start && dISO <= t.end) : [];
+            const CAP = 3;
+            const jobChips = dayJobs.map(j => {
+              const dayNum = j.shootDays.indexOf(dISO) + 1;
+              const multi = j.shootDays.length > 1;
+              const dayNeeds = Store.missing(j).some(m => m !== 'menu' && m !== 'crew') || !Store.menuFor(j, dISO).length || !Store.crewFor(j, dISO).length;
+              return `<button class="cal-job ${j.status}" data-job="${j.id}" data-date="${dISO}" title="${UI.esc(j.productionName)}${multi ? ` — Day ${dayNum} of ${j.shootDays.length}` : ''}">${dayNeeds ? '<span class="cj-miss"></span>' : ''}${multi ? `<span class="cj-daynum">${dayNum}/${j.shootDays.length}</span>` : ''}${UI.esc(j.productionName)}</button>`;
+            });
+            const toChips = dayTO.map(t => {
+              const p = Store.person(t.personId);
+              return `<span class="cal-job timeoff" title="${UI.esc(p.name)} — time off">${UI.esc(p.name.split(' ')[0])} off</span>`;
+            });
+            const chips = [...jobChips, ...toChips];
+            const shownChips = chips.slice(0, CAP);
+            const extra = chips.length - shownChips.length;
             return `
-            <div class="cal-cell ${other ? 'other' : ''} ${dISO === T ? 'today' : ''}">
+            <div class="cal-cell ${other ? 'other' : ''} ${dISO === T ? 'today' : ''}" data-day="${dISO}">
               <span class="c-num">${d.getDate()}</span>
-              ${dayJobs.map(j => {
-                const dayNum = j.shootDays.indexOf(dISO) + 1;
-                const multi = j.shootDays.length > 1;
-                const dayNeeds = Store.missing(j).some(m => m !== 'menu' && m !== 'crew') || !Store.menuFor(j, dISO).length || !Store.crewFor(j, dISO).length;
-                return `<button class="cal-job ${j.status}" data-job="${j.id}" data-date="${dISO}" title="${UI.esc(j.productionName)}${multi ? ` — Day ${dayNum} of ${j.shootDays.length}` : ''}">${dayNeeds ? '<span class="cj-miss"></span>' : ''}${multi ? `<span class="cj-daynum">${dayNum}/${j.shootDays.length}</span>` : ''}${UI.esc(j.productionName)}</button>`;
-              }).join('')}
-              ${dayTO.map(t => {
-                const p = Store.person(t.personId);
-                return `<span class="cal-job timeoff" title="${UI.esc(p.name)} — time off">${UI.esc(p.name.split(' ')[0])} off</span>`;
-              }).join('')}
+              ${shownChips.join('')}
+              ${extra > 0 ? `<button class="cal-more" data-day-more="${dISO}">+${extra} more</button>` : ''}
             </div>`;
           }).join('')}
         </div>
@@ -88,7 +94,13 @@ Views.calendar = (() => {
     if (nj) nj.onclick = () => Views.dashboard.openJobForm();
 
     el.querySelectorAll('[data-job]').forEach(b => {
-      b.onclick = () => UI.openJobPanel(b.dataset.job, b.dataset.date);
+      b.onclick = (e) => { e.stopPropagation(); UI.openJobPanel(b.dataset.job, b.dataset.date); };
+    });
+    el.querySelectorAll('[data-day-more]').forEach(b => {
+      b.onclick = (e) => { e.stopPropagation(); UI.openDayPanel(b.dataset.dayMore); };
+    });
+    el.querySelectorAll('.cal-cell[data-day]').forEach(c => {
+      c.onclick = () => UI.openDayPanel(c.dataset.day);
     });
   }
 

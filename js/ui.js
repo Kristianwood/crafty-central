@@ -86,12 +86,14 @@ const UI = (() => {
      Job detail side panel
      ============================================================ */
   let panelJobId = null;
+  let panelDate = null; // day-view mode: a date instead of a job
   let panelHideTimer = null;
   let panelDayIdx = 0;
   let lastPanelDay = null; // activeDate at the previous render, for open-state restore
 
   function openJobPanel(jobId, date) {
     panelJobId = jobId;
+    panelDate = null;
     const j = Store.job(jobId);
     panelDayIdx = (date && j) ? Math.max(0, j.shootDays.indexOf(date)) : 0;
     lastPanelDay = null;
@@ -105,8 +107,104 @@ const UI = (() => {
     document.querySelectorAll('.cal-job').forEach(el =>
       el.classList.toggle('selected', el.dataset.job === jobId));
   }
+  /* Day view: everything happening on one date, in the same side sheet */
+  function openDayPanel(date) {
+    panelDate = date;
+    panelJobId = null;
+    lastPanelDay = null;
+    document.getElementById('panelInner').innerHTML = '';
+    renderPanel();
+    const panel = document.getElementById('panel');
+    const scrim = document.getElementById('panelScrim');
+    clearTimeout(panelHideTimer);
+    panel.hidden = false; scrim.hidden = false;
+    requestAnimationFrame(() => { panel.classList.add('open'); scrim.classList.add('open'); });
+    document.querySelectorAll('.cal-job.selected').forEach(el => el.classList.remove('selected'));
+  }
+
+  function renderDayPanel() {
+    const date = panelDate;
+    const inner = document.getElementById('panelInner');
+    const jobs = Store.jobsOn(date);
+    const canSeeTO = Store.can('approveTimeOff');
+    const myId = Store.me().id;
+    const offs = Store.get().timeOff.filter(t =>
+      t.status === 'approved' && date >= t.start && date <= t.end &&
+      (canSeeTO || t.personId === myId));
+    const d = new Date(date + 'T00:00:00');
+
+    inner.innerHTML = `
+      <div class="panel-top">
+        <div>
+          <div class="panel-kicker">Day view</div>
+          <h2 class="panel-title">${d.toLocaleDateString('en-CA', { weekday: 'long', month: 'long', day: 'numeric' })}</h2>
+          <div class="panel-sub text-inkish">${jobs.length ? `${jobs.length} job${jobs.length === 1 ? '' : 's'} on the truck` : 'Nothing on the books'}${offs.length ? ` · ${offs.length} off` : ''}</div>
+        </div>
+        <button class="panel-close" id="panelCloseBtn" aria-label="Close">${ICONS.x}</button>
+      </div>
+
+      <div class="dp-list">
+        ${jobs.map(j => {
+          const dayNum = j.shootDays.indexOf(date) + 1;
+          const crew = Store.crewFor(j, date);
+          const menu = Store.menuFor(j, date);
+          const head = Store.dayVal(j, date, 'headcount');
+          return `
+          <div class="dp-job">
+            <div class="dp-job-head">
+              <div>
+                <div class="dp-name">${esc(j.productionName)}</div>
+                <div class="dp-co">${esc(j.productionCompany)}${j.shootDays.length > 1 ? ` · Day ${dayNum} of ${j.shootDays.length}` : ''}</div>
+              </div>
+              ${statusPill(j.status)}
+            </div>
+            <div class="dp-meta">
+              <span>${ICONS.clock}${fmtTime12(Store.dayVal(j, date, 'callTime'))} – ${fmtTime12(Store.dayVal(j, date, 'wrapTime'))}</span>
+              <span>${ICONS.people}${head || '—'} on set</span>
+              <span>${ICONS.truck}${crew.length ? crew.length + ' crew' : '<b class="dp-gap">no crew</b>'}</span>
+              <span>${ICONS.menu}${menu.length ? menu.length + ' items' : '<b class="dp-gap">no menu</b>'}</span>
+            </div>
+            ${crew.length ? `<div class="dp-crew">${avatarStack(crew.map(c => c.personId), 6)}</div>` : ''}
+            <div class="dp-actions">
+              <button class="btn sm" data-dp-sheet="${j.id}">${ICONS.edit} Job sheet</button>
+              <button class="btn sm" data-dp-brief="${j.id}">${ICONS.doc} Brief</button>
+            </div>
+          </div>`;
+        }).join('')}
+        ${!jobs.length ? `<div class="empty" style="padding:32px 20px">${ICONS.truck}<div class="e-title">A quiet one</div><div class="e-sub">No jobs on this day${Store.can('createJob') ? ' — yet' : ''}.</div></div>` : ''}
+
+        ${offs.length ? `
+        <div class="dp-off-wrap">
+          <div class="dp-off-title">Off this day</div>
+          ${offs.map(t => {
+            const p = Store.person(t.personId);
+            return p ? `<span class="dp-off">${avatar(p, 'sm')}<b>${esc(p.name)}</b><span>${esc(t.reason || 'time off')}</span></span>` : '';
+          }).join('')}
+        </div>` : ''}
+
+        ${Store.can('createJob') ? `
+        <button class="btn primary" id="dpNewJobBtn" style="justify-content:center">${ICONS.plus} New job on ${fmtShort(date)}</button>` : ''}
+      </div>`;
+
+    inner.querySelector('#panelCloseBtn').onclick = closeJobPanel;
+    inner.querySelectorAll('[data-dp-sheet]').forEach(b => b.onclick = () => openJobPanel(b.dataset.dpSheet, date));
+    inner.querySelectorAll('[data-dp-brief]').forEach(b => {
+      b.onclick = () => {
+        const id = b.dataset.dpBrief;
+        closeJobPanel();
+        App.openBrief(id, date);
+      };
+    });
+    const newBtn = inner.querySelector('#dpNewJobBtn');
+    if (newBtn) newBtn.onclick = () => {
+      closeJobPanel();
+      Views.dashboard.openJobForm(null, date);
+    };
+  }
+
   function closeJobPanel() {
     panelJobId = null;
+    panelDate = null;
     const panel = document.getElementById('panel');
     const scrim = document.getElementById('panelScrim');
     panel.classList.remove('open'); scrim.classList.remove('open');
@@ -116,6 +214,7 @@ const UI = (() => {
   }
 
   function renderPanel() {
+    if (!panelJobId && panelDate) return renderDayPanel();
     if (!panelJobId) return;
     const j = Store.job(panelJobId);
     if (!j) { closeJobPanel(); return; }
@@ -486,7 +585,8 @@ const UI = (() => {
     esc, fmtShort, fmtLong, fmtRange, fmtDays, fmtMoney, fmtTime12, fmtClock, fmtAgo,
     avatar, avatarStack, statusPill,
     toast, openModal, closeModal,
-    openJobPanel, closeJobPanel, renderPanel,
+    openJobPanel, openDayPanel, closeJobPanel, renderPanel,
     get panelJobId() { return panelJobId; },
+    get panelDate() { return panelDate; },
   };
 })();

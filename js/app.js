@@ -34,13 +34,14 @@ const App = (() => {
     refreshView();
     closeNotifDrawer();
     window.scrollTo({ top: 0 });
+    document.querySelector('.main-col')?.scrollTo({ top: 0 });
   }
 
   function refreshView() {
     if (!currentView) return;
     Views[currentView].render(document.getElementById('content'));
     refreshBadges();
-    if (UI.panelJobId) UI.renderPanel();
+    if (UI.panelJobId || UI.panelDate) UI.renderPanel();
   }
 
   /* ---------- nav ---------- */

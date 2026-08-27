@@ -370,10 +370,10 @@ Views.dashboard = (() => {
 
   /* ============ Job create/edit form (modal) ============ */
 
-  function openJobForm(jobId) {
+  function openJobForm(jobId, presetDate) {
     const j = jobId ? Store.job(jobId) : null;
     const s = Store.get().settings;
-    let days = j ? j.shootDays.slice() : [];
+    let days = j ? j.shootDays.slice() : (presetDate ? [presetDate] : []);
 
     UI.openModal(`
       <div class="modal-head">
