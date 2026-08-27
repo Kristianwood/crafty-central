@@ -28,12 +28,12 @@ Views.finances = (() => {
     el.innerHTML = `
       <div class="view-enter">
         <div class="stat-row stagger">
-          <div class="stat-cell" style="--i:0">
+          <div class="stat-cell ${outstanding > 0 ? 'tint-clay' : ''}" style="--i:0">
             <div class="stat-label">Outstanding</div>
             <div class="stat-value">${UI.fmtMoney(outstanding).replace('.00','')}</div>
             <div class="stat-sub">${(n => `${n} unpaid invoice${n === 1 ? '' : 's'}`)(invoices.filter(i => i.status !== 'paid').length)}</div>
           </div>
-          <div class="stat-cell" style="--i:1">
+          <div class="stat-cell tint-olive" style="--i:1">
             <div class="stat-label">Collected · 30 days</div>
             <div class="stat-value">${UI.fmtMoney(collected).replace('.00','')}</div>
             <div class="stat-sub up">marked paid</div>

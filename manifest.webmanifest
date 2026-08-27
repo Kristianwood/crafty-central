@@ -4,8 +4,8 @@
   "description": "The all-in-one hub for Crafty — jobs, calendar, crew, chat, and invoicing.",
   "start_url": ".",
   "display": "standalone",
-  "background_color": "#f7fafa",
-  "theme_color": "#f7fafa",
+  "background_color": "#f5efe2",
+  "theme_color": "#f5efe2",
   "icons": [
     { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
   ]

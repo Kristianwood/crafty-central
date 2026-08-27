@@ -48,7 +48,7 @@ const UI = (() => {
     const extra = ids.length - shown.length;
     let html = '<span class="avatar-stack">';
     shown.forEach(id => { html += avatar(Store.person(id), 'sm'); });
-    if (extra > 0) html += `<span class="avatar sm" style="background:#a8a29e">+${extra}</span>`;
+    if (extra > 0) html += `<span class="avatar sm" style="background:#a19786">+${extra}</span>`;
     return html + '</span>';
   }
 
@@ -321,6 +321,7 @@ const UI = (() => {
 
       <div class="panel-actions">
         ${canEdit && j.status === 'estimate' ? `<button class="btn primary" id="panelConfirmBtn">${ICONS.check} Confirm job</button>` : ''}
+        <button class="btn ${canEdit && j.status === 'estimate' ? '' : 'primary'}" id="panelBriefBtn">${ICONS.doc} Job brief</button>
         ${canEdit ? `<button class="btn" id="panelEditBtn">${ICONS.edit} Edit job</button>` : ''}
         ${Store.can('finances') && j.status !== 'invoiced' ? `<button class="btn" id="panelInvoiceBtn">${ICONS.doc} Create invoice</button>` : ''}
         ${canEdit ? `<button class="btn danger" id="panelDeleteBtn">${ICONS.x} Delete</button>` : ''}
@@ -432,6 +433,13 @@ const UI = (() => {
         renderPanel(); App.refreshView();
       };
     });
+
+    const briefBtn = inner.querySelector('#panelBriefBtn');
+    if (briefBtn) briefBtn.onclick = () => {
+      const day = j.shootDays[panelDayIdx];
+      closeJobPanel();
+      App.openBrief(j.id, day);
+    };
 
     const statusSel = inner.querySelector('#panelStatusSel');
     if (statusSel) statusSel.onchange = () => {

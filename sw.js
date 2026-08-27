@@ -1,5 +1,5 @@
 /* Crafty Central — service worker: cache the app shell for offline + install */
-const CACHE = 'crafty-central-v9';
+const CACHE = 'crafty-central-v10';
 const SHELL = [
   '.',
   'index.html',
@@ -18,6 +18,7 @@ const SHELL = [
   'js/views/chat.js',
   'js/views/directory.js',
   'js/views/finances.js',
+  'js/views/brief.js',
   'icon.svg',
   'manifest.webmanifest',
 ];

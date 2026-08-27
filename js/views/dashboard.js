@@ -28,14 +28,14 @@ Views.dashboard = (() => {
             <div class="stat-value">${next7.length}</div>
             <div class="stat-sub">${upcoming.length} upcoming total</div>
           </div>
-          <div class="stat-cell" style="--i:1">
+          <div class="stat-cell tint-olive" style="--i:1">
             <div class="stat-label">Meals to plan · 7 days</div>
             <div class="stat-value">${headcount7}<span class="unit">covers</span></div>
             <div class="stat-sub">across confirmed shoot days</div>
           </div>
-          <div class="stat-cell" style="--i:2">
+          <div class="stat-cell ${needsAttention.length ? 'tint-clay' : ''}" style="--i:2">
             <div class="stat-label">Needs attention</div>
-            <div class="stat-value" style="${needsAttention.length ? 'color:var(--red)' : ''}">${needsAttention.length}</div>
+            <div class="stat-value">${needsAttention.length}</div>
             <div class="stat-sub">jobs with missing info</div>
           </div>
           ${Store.can('finances') ? `
@@ -326,7 +326,7 @@ Views.dashboard = (() => {
     const d = new Date(first + 'T00:00:00');
     const miss = Store.missing(j);
     return `
-      <div class="job-row" data-open-job="${j.id}" style="--i:${i}">
+      <div class="job-row ${miss.length ? 'has-miss' : ''}" data-open-job="${j.id}" style="--i:${i}">
         <div class="job-date">
           <span class="d-mon">${d.toLocaleDateString('en-CA', { month: 'short' })}</span>
           <span class="d-day">${d.getDate()}</span>

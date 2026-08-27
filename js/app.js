@@ -26,7 +26,7 @@ const App = (() => {
 
   function go(viewId) {
     const allowed = allowedNav();
-    if (!allowed.some(n => n.id === viewId)) viewId = allowed[0].id;
+    if (viewId !== 'brief' && !allowed.some(n => n.id === viewId)) viewId = allowed[0].id;
     currentView = viewId;
     UI.closeJobPanel();
     document.getElementById('topbarTitle').textContent = Views[viewId].title;
@@ -317,8 +317,15 @@ const App = (() => {
   }
   document.addEventListener('DOMContentLoaded', boot);
 
+  /* Job brief: a full-page, read-first call sheet for one job.
+     Reachable from any job sheet; not a nav item. */
+  function openBrief(jobId, date) {
+    Views.brief.setJob(jobId, date);
+    go('brief');
+  }
+
   return {
-    go, refreshView, refreshBadges, renderRoleSwitch,
+    go, openBrief, refreshView, refreshBadges, renderRoleSwitch,
     get started() { return started; },
   };
 })();
