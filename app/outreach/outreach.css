@@ -1,0 +1,32 @@
+/* Page-only styles, lifted verbatim from the <style> block that
+   used to sit in the head of outreach.html. */
+
+.outreach-wrap {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 28px 16px 60px;
+  background: var(--bg);
+}
+
+.outreach-card {
+  width: 100%;
+  max-width: 560px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  padding: 30px 28px;
+  animation: view-in .45s var(--ease) both;
+}
+
+.oc-title { font-size: 22px; font-weight: 700; letter-spacing: -.02em; margin: 18px 0 6px; }
+.oc-sub { font-size: 14px; color: var(--ink-2); margin-bottom: 22px; line-height: 1.55; }
+.oc-done { text-align: center; padding: 30px 10px; }
+.oc-done .big {
+  width: 52px; height: 52px; border-radius: 50%;
+  background: var(--green-soft); color: var(--green);
+  display: grid; place-items: center; margin: 0 auto 16px;
+}
+.oc-done .big svg { width: 26px; height: 26px; }
+.oc-foot { text-align: center; font-size: 12px; color: var(--ink-3); margin-top: 18px; }

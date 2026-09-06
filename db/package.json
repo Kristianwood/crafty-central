@@ -1,0 +1,4 @@
+{
+  "type": "module",
+  "//": "Scopes ESM to the migration and seed scripts, which node runs directly with --experimental-strip-types. Without it node warns on every run. The app itself is unaffected."
+}

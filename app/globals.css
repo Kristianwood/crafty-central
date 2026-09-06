@@ -1,0 +1,47 @@
+/* ============================================================
+   Crafty Central — globals.css
+
+   Two things happen here, in this order:
+
+   1. Tailwind, plus a @theme block mirroring the Santorini
+      palette so the tokens are usable as normal Tailwind
+      classes (text-ink, bg-surface, border-line, text-accent).
+   2. app.css — the hand-written stylesheet the whole app is
+      built on, carried over unchanged from the vanilla build.
+
+   Component styling lives in app.css. Reach for Tailwind for
+   new one-off layout, and change colours in ONE place: the
+   :root block at the top of app.css, mirrored below.
+   ============================================================ */
+
+@import "tailwindcss";
+@import "./app.css";
+
+@theme {
+  --color-bg: #f5efe2;
+  --color-surface: #ece3d0;
+  --color-card: #faf6ec;
+  --color-ink: #24221d;
+  --color-ink-2: #645c50;
+  --color-ink-3: #a19786;
+  --color-line: #ddd2bf;
+  --color-accent: #2e6ba8;
+  --color-accent-ink: #24547f;
+  --color-accent-soft: #dce9f5;
+  --color-green: #7a8a5e;
+  --color-green-ink: #56633f;
+  --color-green-soft: #e1eecc;
+  --color-red: #b95c33;
+  --color-red-ink: #8c491a;
+  --color-red-soft: #f8e2d3;
+  --color-blue: #64809c;
+  --color-blue-soft: #e2e9ef;
+  --color-amber: #8f7440;
+  --color-amber-soft: #ece1c8;
+
+  --font-sans: "Figtree", system-ui, -apple-system, sans-serif;
+  --font-display: "Caprasimo", Georgia, serif;
+
+  --radius-crafty: 20px;
+  --radius-crafty-lg: 28px;
+}
