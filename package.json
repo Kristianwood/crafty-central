@@ -9,8 +9,8 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
-    "db:migrate": "node --env-file-if-exists=.env.local --experimental-strip-types db/migrate.ts",
-    "db:seed": "node --env-file-if-exists=.env.local --experimental-strip-types db/seed.ts"
+    "db:migrate": "node --env-file-if-exists=.env --experimental-strip-types db/migrate.ts",
+    "db:seed": "node --env-file-if-exists=.env --experimental-strip-types db/seed.ts"
   },
   "dependencies": {
     "bcryptjs": "3.0.3",

@@ -6,7 +6,7 @@ Next.js 16 (App Router) · TypeScript · Tailwind v4 · MySQL · npm.
 
 ```bash
 npm install
-cp .env.example .env.local     # fill in your MySQL details
+cp .env.example .env           # fill in your MySQL details
 npm run db:migrate             # create the schema
 npm run db:seed                # optional demo data
 npm run dev                    # http://localhost:3000
@@ -98,5 +98,5 @@ the way it always did. Two things carried over that are worth knowing:
 | Restart | pm2 — first start command `npm start` |
 | Port | whatever you assign the site |
 
-`.env.local` lives on the server and survives every deploy and rollback.
+`.env` lives on the server and survives every deploy and rollback.
 Run `npm run db:migrate` there once before the first deploy.

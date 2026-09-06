@@ -24,7 +24,7 @@ function secret(): string {
     );
   }
   // Development only: a fixed fallback so `npm run dev` works before
-  // .env.local exists. Sessions reset whenever this changes.
+  // .env exists. Sessions reset whenever this changes.
   return "crafty-central-development-only-secret";
 }
 

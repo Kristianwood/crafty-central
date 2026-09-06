@@ -21,9 +21,11 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# env — secrets live on the server and survive every deploy
+# env — .env holds the real credentials and is never committed.
+# Only .env.example belongs in the repo.
 .env
-.env*.local
+.env.*
+!.env.example
 
 # written into the app directory on a deployed server by the Command Center
 build-info.json

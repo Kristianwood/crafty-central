@@ -7,7 +7,7 @@
 
      npm run db:migrate
 
-   Reads .env.local if present — see .env.example.
+   Reads .env if present — see .env.example.
    ============================================================ */
 
 import { readFile } from "node:fs/promises";
@@ -66,6 +66,6 @@ async function main() {
 main().catch((err) => {
   console.error("\nMigration failed.\n");
   console.error(err instanceof Error ? err.message : err);
-  console.error("\nCheck the DB_* values in .env.local (see .env.example).");
+  console.error("\nCheck the DB_* values in .env (see .env.example).");
   process.exit(1);
 });
