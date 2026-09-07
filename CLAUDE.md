@@ -90,9 +90,20 @@ lines and a snapshot of the billing address, and the PDF is archived in
 `invoice_documents` the moment it is marked sent. From then on "the invoice
 we sent" means those bytes. Lines are frozen once an invoice leaves draft;
 reopening a sent invoice discards the archived PDF, and a paid one cannot be
-reopened at all. Invoices written before 1.2 have no lines, and
-`invoiceLines()` prices those from the job exactly as the old build did — so
-nothing on an older database changes value on upgrade.
+reopened at all. `markInvoice()` claims the transition with the status the
+caller read, and the PDF is archived from the row that actually committed,
+so a concurrent save cannot leave an archive describing something else.
+
+The migration backfills the lines of every invoice written before 1.2, at
+the value its job priced out to on the day of the upgrade — so nothing
+changes value, and nothing stays live-priced afterwards. `invoiceLines()`
+still falls back to the job for an invoice with no lines, which is now only
+a belt-and-braces path.
+
+**Deleting.** A job whose invoice has already gone out is not deletable:
+the foreign keys cascade, and that invoice is the only record of what the
+client was charged. Drafts go with the job. Nobody deletes a person of
+higher rank, and the owner is not deletable at all.
 
 **why: kits are copied, not referenced.** A kit is a named bundle of
 catalogue items. Dropping one onto an invoice copies its lines
@@ -112,6 +123,13 @@ falls back to the default rather than rendering a blank page.
 unanswered-request reminder is too. `remindStaleRequests()` is called from
 the workspace load for anyone who can see requests, and the `UPDATE` on
 `reminded_at` is what stops two simultaneous pollers both sending it.
+
+**Timestamps.** Every `DATETIME` is written server-local through
+`mysqlDateTime()` in `lib/db.ts`, because they are compared against `NOW()`.
+They cross to the browser as ISO 8601 (`isoDateTime()`), and are shown with
+`fmtStamp()`, which reads the *local* date. Slicing the first ten characters
+of an ISO string is the UTC date, and prints tomorrow for anything done
+after about 8pm — do not do it.
 
 **Schema changes go in two places.** `db/schema.sql` describes a fresh
 database; the patch list in `db/migrate.ts` brings an existing one up to

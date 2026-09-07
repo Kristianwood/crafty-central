@@ -95,6 +95,10 @@ Tracking lives on the Finances → Invoices tab and on the dashboard: drafts,
 sent, **overdue** (sent and past its due date), and paid, with the days
 overdue counted for you.
 
+Invoices written before 1.2 are given their lines by `npm run db:migrate`,
+frozen at the value their job priced out to at that moment. Nothing changes
+value on the day you upgrade, and nothing keeps re-pricing itself afterwards.
+
 ## Two endpoints not to touch
 
 `app/api/health` and `app/api/version` are what the Forthway Command Center
