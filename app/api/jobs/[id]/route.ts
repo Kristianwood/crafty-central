@@ -2,6 +2,7 @@ import { bad, body, handle, str } from "@/lib/api";
 import { requirePermission } from "@/lib/auth";
 import { fmtRange } from "@/lib/format";
 import { deleteJob, getJob, setJobStatus } from "@/lib/repo/jobs";
+import { invoicesForJob } from "@/lib/repo/invoices";
 import { notify } from "@/lib/repo/notifications";
 import type { JobStatus } from "@/lib/types";
 
@@ -39,10 +40,29 @@ export async function PATCH(req: Request, { params }: Params) {
   });
 }
 
+/**
+ * Delete a job. The foreign keys cascade, so this also takes the
+ * job's invoices, their lines and the PDFs archived against them —
+ * which is right for a job that was never billed and quite wrong for
+ * one that was. An invoice that has gone out is the record of what a
+ * client was charged, so a job carrying one is not deleted by
+ * whoever can edit jobs; it is turned away here with a reason.
+ */
 export async function DELETE(_req: Request, { params }: Params) {
   return handle(async () => {
     await requirePermission("editJob");
     const { id } = await params;
+
+    const issued = (await invoicesForJob(id)).filter((inv) => inv.status !== "draft");
+    if (issued.length) {
+      const numbers = issued.map((inv) => inv.number).join(", ");
+      bad(
+        `This job has been invoiced (${numbers}). Delete the invoice first, or leave the job where it is — ` +
+          "an invoice that has gone out is the only record of what was charged.",
+        409,
+      );
+    }
+
     await deleteJob(id);
     return { ok: true };
   });

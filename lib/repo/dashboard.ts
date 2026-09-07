@@ -42,7 +42,18 @@ export async function saveDashboard(
   return clean;
 }
 
+/**
+ * Put the arrangement back to the default — the widgets, their order
+ * and the stat tiles. The notes are not part of the arrangement and
+ * are the one thing here nobody else can recover, so they survive:
+ * "reset my dashboard" must never be the way someone loses them.
+ */
 export async function resetDashboard(personId: string, role: Role): Promise<DashboardLayout> {
-  await execute("DELETE FROM dashboard_layouts WHERE person_id = ?", [personId]);
-  return defaultDashboard(role);
+  const current = await getDashboard(personId, role);
+  const fresh: DashboardLayout = { ...defaultDashboard(role), notes: current.notes };
+  if (!fresh.notes) {
+    await execute("DELETE FROM dashboard_layouts WHERE person_id = ?", [personId]);
+    return fresh;
+  }
+  return saveDashboard(personId, role, fresh);
 }

@@ -35,7 +35,7 @@ import {
   lineAmount,
   type InvoiceState,
 } from "@/lib/domain";
-import { fmtMoney, fmtShort } from "@/lib/format";
+import { fmtMoney, fmtShort, fmtStamp } from "@/lib/format";
 import type { BillTo, Invoice, InvoiceLine, Job, Settings } from "@/lib/types";
 import { InvoiceDoc } from "./finances/invoice-doc";
 import { InvoiceStatePill, serverToday } from "./finances/invoice-pill";
@@ -652,8 +652,8 @@ function SentView({ inv, job }: { inv: Invoice; job: Job | undefined }) {
     }
   }
 
-  const sentOn = inv.sentAt ? fmtShort(inv.sentAt.slice(0, 10)) : "—";
-  const paidOn = inv.paidAt ? fmtShort(inv.paidAt.slice(0, 10)) : "—";
+  const sentOn = fmtStamp(inv.sentAt);
+  const paidOn = fmtStamp(inv.paidAt);
 
   return (
     <div className="inv-editor">

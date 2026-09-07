@@ -48,18 +48,34 @@ export async function PATCH(req: Request, { params }: Params) {
     if (!inv) bad("That invoice is gone.", 404);
     if (inv!.status === status) return { invoice: inv };
 
+    /* Paid is the end of the line. Walking one back to "sent" used to
+       be accepted and cleared paid_at with it, so a paid invoice could
+       quietly rejoin the outstanding column. */
+    if (inv!.status === "paid") {
+      bad("That invoice is paid. Its record does not go backwards.", 409);
+    }
+
     const [job, settings] = await Promise.all([getJob(inv!.jobId), getSettings()]);
 
     if (status === "sent" || status === "paid") {
-      // Archive what is going out. A sent invoice keeps the copy it
-      // already has; a draft being paid directly gets one now so the
-      // paperwork exists either way.
+      /* Claim the transition first. Only then is it safe to archive:
+         the lines cannot change underneath us afterwards, because a
+         save is refused on anything that is no longer a draft. Doing
+         it the other way round left a window where a save between the
+         render and the status change produced an archive that did not
+         match the invoice it was filed against. */
+      const moved = await markInvoice(id, status, { from: inv!.status });
+      if (!moved) bad("Someone else just changed that invoice. Have another look.", 409);
+
+      // A sent invoice keeps the copy it already has; a draft paid
+      // directly gets one now, so the paperwork exists either way.
       if (!inv!.hasDocument) {
-        const stamped = { ...inv!, status, sentAt: inv!.sentAt ?? new Date().toISOString() };
-        const pdf = await renderInvoicePdf({ invoice: stamped, job, settings });
-        await storeInvoiceDocument(inv!.id, invoiceFilename(inv!), pdf);
+        const committed = await getInvoice(id);
+        if (committed) {
+          const pdf = await renderInvoicePdf({ invoice: committed, job, settings });
+          await storeInvoiceDocument(committed.id, invoiceFilename(committed), pdf);
+        }
       }
-      await markInvoice(id, status);
       if (status === "paid") {
         await notify(
           "admin",
@@ -70,10 +86,11 @@ export async function PATCH(req: Request, { params }: Params) {
         );
       }
     } else {
-      // Back to draft: only from sent. A paid invoice is history.
-      if (inv!.status === "paid") bad("A paid invoice cannot be reopened.", 409);
+      // Back to draft, which by here can only mean from sent — paid was
+      // turned away above.
+      const moved = await markInvoice(id, "draft", { from: inv!.status });
+      if (!moved) bad("Someone else just changed that invoice. Have another look.", 409);
       await deleteInvoiceDocument(id);
-      await markInvoice(id, "draft");
     }
 
     return { invoice: await getInvoice(id) };

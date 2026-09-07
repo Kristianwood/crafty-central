@@ -24,6 +24,7 @@ import {
   statTilesFor,
   todayISO,
   unansweredRequests,
+  MAX_STAT_TILES,
 } from "@/lib/domain";
 import { fmtMoney, statSizeClass } from "@/lib/format";
 import type { Job, StatId, Workspace } from "@/lib/types";
@@ -31,7 +32,6 @@ import { coversThisWeek, jobsThisWeek, upcomingJobs } from "./derive";
 import type { WidgetProps } from "./widget";
 
 /** The row cannot carry more than this; normalizeDashboard caps it too. */
-const MAX_TILES = 6;
 
 /* The stagger animation reads --i off each child. */
 const stagger = (i: number) => ({ "--i": i }) as CSSProperties;
@@ -136,7 +136,7 @@ export function StatsWidget({ layout, editing, onLayout }: WidgetProps) {
     if (!onLayout) return;
     const on = layout.stats.includes(id);
     const stats = on ? layout.stats.filter((s) => s !== id) : [...layout.stats, id];
-    if (!on && stats.length > MAX_TILES) return;
+    if (!on && stats.length > MAX_STAT_TILES) return;
     onLayout({ ...layout, stats });
   }
 
@@ -171,13 +171,13 @@ export function StatsWidget({ layout, editing, onLayout }: WidgetProps) {
           <div className="stat-pick-head">
             <span>Tiles</span>
             <span className="section-hint">
-              Up to {MAX_TILES}, shown in the order you tick them · {layout.stats.length}/{MAX_TILES}
+              Up to {MAX_STAT_TILES}, shown in the order you tick them · {layout.stats.length}/{MAX_STAT_TILES}
             </span>
           </div>
           <div className="tag-check-row">
             {allowed.map((t) => {
               const on = layout.stats.includes(t.id);
-              const full = !on && layout.stats.length >= MAX_TILES;
+              const full = !on && layout.stats.length >= MAX_STAT_TILES;
               return (
                 <label key={t.id} className={`tag-check ${full ? "is-off" : ""}`.trim()}>
                   <input

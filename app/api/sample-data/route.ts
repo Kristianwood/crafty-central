@@ -24,7 +24,10 @@ export const dynamic = "force-dynamic";
 
 export async function POST() {
   return handle(async () => {
-    const me = await requirePermission("createJob");
+    /* This seeds a company, a priced catalogue, a kit and an invoice
+       alongside the jobs, so it asks for the permission that owns
+       those rather than the one that owns jobs. */
+    const me = await requirePermission("finances");
 
     const existing = await listJobs();
     if (existing.some((j) => j.sample)) bad("The sample data is already here.", 409);

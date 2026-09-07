@@ -16,7 +16,7 @@
      we sent" means from then on, whatever the job does later.
    ============================================================ */
 
-import { execute, isoDateTime, mysqlDateTime, query, queryOne, transaction } from "../db";
+import { execute, isoDateTime, mysqlDateTime, query, queryOne, transaction, type SqlValue } from "../db";
 import { invoiceNumber, todayISO } from "../domain";
 import type { BillTo, Invoice, InvoiceLine, InvoiceStatus } from "../types";
 
@@ -175,24 +175,45 @@ export async function saveInvoice(inv: Invoice): Promise<Invoice> {
   return inv;
 }
 
-/** Status transitions, stamping the matching timestamp. */
-export async function markInvoice(id: string, status: InvoiceStatus, when = new Date()): Promise<void> {
-  const ts = mysqlDateTime(when);
+/**
+ * Move an invoice to a status, stamping the matching timestamp.
+ *
+ * `from` makes it a claim rather than a write: the UPDATE only fires
+ * while the invoice is still in the status the caller read, and the
+ * return value says whether this call is the one that moved it. That
+ * is what lets the caller archive the PDF knowing it is describing the
+ * row that actually committed, instead of one a concurrent save
+ * changed in between.
+ */
+export async function markInvoice(
+  id: string,
+  status: InvoiceStatus,
+  opts: { from?: InvoiceStatus; when?: Date } = {},
+): Promise<boolean> {
+  const ts = mysqlDateTime(opts.when ?? new Date());
+  const guard = opts.from ? " AND status = ?" : "";
+  const tail: SqlValue[] = opts.from ? [id, opts.from] : [id];
+
+  let res;
   if (status === "sent") {
-    await execute(
-      "UPDATE invoices SET status = 'sent', sent_at = COALESCE(sent_at, ?), paid_at = NULL WHERE id = ?",
-      [ts, id],
+    res = await execute(
+      `UPDATE invoices SET status = 'sent', sent_at = COALESCE(sent_at, ?), paid_at = NULL
+        WHERE id = ?${guard}`,
+      [ts, ...tail],
     );
   } else if (status === "paid") {
-    await execute(
-      "UPDATE invoices SET status = 'paid', sent_at = COALESCE(sent_at, ?), paid_at = ? WHERE id = ?",
-      [ts, ts, id],
+    res = await execute(
+      `UPDATE invoices SET status = 'paid', sent_at = COALESCE(sent_at, ?), paid_at = ?
+        WHERE id = ?${guard}`,
+      [ts, ts, ...tail],
     );
   } else {
-    await execute("UPDATE invoices SET status = 'draft', sent_at = NULL, paid_at = NULL WHERE id = ?", [
-      id,
-    ]);
+    res = await execute(
+      `UPDATE invoices SET status = 'draft', sent_at = NULL, paid_at = NULL WHERE id = ?${guard}`,
+      tail,
+    );
   }
+  return res.affectedRows > 0;
 }
 
 export async function deleteInvoice(id: string): Promise<void> {

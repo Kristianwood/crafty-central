@@ -435,6 +435,9 @@ export const STAT_TILES: StatDef[] = [
   { id: "overdue", label: "Overdue invoices", needs: "finances" },
 ];
 
+/** How many tiles fit across the stat row before it stops reading. */
+export const MAX_STAT_TILES = 6;
+
 export const widgetDef = (id: WidgetId): WidgetDef | undefined => WIDGETS.find((w) => w.id === id);
 
 export const widgetsFor = (role: Role): WidgetDef[] =>
@@ -486,7 +489,7 @@ export function normalizeDashboard(raw: unknown, role: Role): DashboardLayout {
 
   return {
     widgets: widgets.length ? widgets : base.widgets,
-    stats: stats.length ? stats.slice(0, 6) : base.stats,
+    stats: stats.length ? stats.slice(0, MAX_STAT_TILES) : base.stats,
     notes,
   };
 }

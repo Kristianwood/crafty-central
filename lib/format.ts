@@ -39,6 +39,26 @@ export function fmtTime12(t: string | number | null | undefined): string {
   return `${((h + 11) % 12) + 1}:${String(m || 0).padStart(2, "0")} ${ap}`;
 }
 
+/**
+ * The local calendar date of an ISO timestamp, as the yyyy-mm-dd the
+ * date formatters take. Slicing the first ten characters of the ISO
+ * string looks equivalent and is not: that is the UTC date, so an
+ * invoice sent at nine on Monday evening in Toronto prints as Tuesday.
+ */
+export function localDate(isoTimestamp: string | null | undefined): string | null {
+  if (!isoTimestamp) return null;
+  const d = new Date(isoTimestamp);
+  if (Number.isNaN(d.getTime())) return null;
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+
+/** That date, already formatted — the common case at a call site. */
+export const fmtStamp = (isoTimestamp: string | null | undefined): string => {
+  const d = localDate(isoTimestamp);
+  return d ? fmtShort(d) : "—";
+};
+
 export const fmtClock = (ts: number) =>
   new Date(ts).toLocaleTimeString("en-CA", { hour: "numeric", minute: "2-digit" });
 

@@ -25,7 +25,7 @@ import {
   invoiceTotal,
   lineAmount,
 } from "@/lib/domain";
-import { fmtDays, fmtMoney, fmtShort } from "@/lib/format";
+import { fmtDays, fmtMoney, fmtShort, fmtStamp} from "@/lib/format";
 import type { Company, Invoice, Job } from "@/lib/types";
 import { serverToday } from "./invoice-pill";
 
@@ -111,13 +111,13 @@ export function InvoiceDoc({ job, invoice }: { job: Job | undefined; invoice: In
               {doc.sentAt && (
                 <>
                   <br />
-                  Sent {fmtShort(doc.sentAt.slice(0, 10))}
+                  Sent {fmtStamp(doc.sentAt)}
                 </>
               )}
               {doc.paidAt && (
                 <>
                   <br />
-                  Paid {fmtShort(doc.paidAt.slice(0, 10))}
+                  Paid {fmtStamp(doc.paidAt)}
                 </>
               )}
               {(state === "paid" || state === "overdue") && (
@@ -230,7 +230,7 @@ export function InvoiceDoc({ job, invoice }: { job: Job | undefined; invoice: In
       {!isEstimate && (
         <div className="doc-pay">
           {state === "paid" && doc.paidAt
-            ? `Paid ${fmtShort(doc.paidAt.slice(0, 10))}. Thank you.`
+            ? `Paid ${fmtStamp(doc.paidAt)}. Thank you.`
             : `Payment due ${fmtShort(doc.dueOn)} · e-transfer or cheque payable to Crafty.`}
         </div>
       )}

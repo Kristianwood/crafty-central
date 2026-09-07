@@ -233,6 +233,7 @@ function JobSheet({ job: j, dayIdx: rawDayIdx }: { job: Job; dayIdx: number }) {
 
   const canEdit = can("editJob");
   const canCrew = can("assignCrew");
+  const [drafting, setDrafting] = useState(false);
   const miss = useMemo(() => missing(j), [j]);
 
   const multiDay = j.shootDays.length > 1;
@@ -451,15 +452,27 @@ function JobSheet({ job: j, dayIdx: rawDayIdx }: { job: Job; dayIdx: number }) {
         {can("finances") && j.status !== "invoiced" && (
           <button
             className="btn"
+            /* Drafting is a POST that mints a number, so a second click
+               while the first is still in flight would mint a second
+               invoice for the same job. */
+            disabled={drafting}
             onClick={async () => {
-              const out = await mutate<{ invoice: { id: string; number: string } }>(
-                `/api/jobs/${j.id}/invoice`,
-              );
-              toast(`Invoice ${out.invoice.number} drafted`, "doc");
-              openModal(<InvoiceEditor invoiceId={out.invoice.id} />);
+              if (drafting) return;
+              setDrafting(true);
+              try {
+                const out = await mutate<{ invoice: { id: string; number: string } }>(
+                  `/api/jobs/${j.id}/invoice`,
+                );
+                toast(`Invoice ${out.invoice.number} drafted`, "doc");
+                openModal(<InvoiceEditor invoiceId={out.invoice.id} />);
+              } catch {
+                /* mutate has already toasted why. */
+              } finally {
+                setDrafting(false);
+              }
             }}
           >
-            <Icon name="doc" /> Create invoice
+            <Icon name="doc" /> {drafting ? "Drafting…" : "Create invoice"}
           </button>
         )}
 
@@ -479,7 +492,14 @@ function JobSheet({ job: j, dayIdx: rawDayIdx }: { job: Job; dayIdx: number }) {
           <button
             className="btn danger"
             onClick={async () => {
-              if (!confirm(`Delete "${j.productionName}"? This also removes its invoices.`)) return;
+              if (
+                !confirm(
+                  `Delete "${j.productionName}"? Any draft invoice on it goes too. ` +
+                    "A job whose invoice has already gone out cannot be deleted.",
+                )
+              ) {
+                return;
+              }
               await mutate(`/api/jobs/${j.id}`, undefined, "DELETE");
               closePanel();
               toast("Job deleted", "x");

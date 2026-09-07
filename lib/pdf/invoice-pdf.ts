@@ -21,7 +21,7 @@ import {
   invoiceTotal,
   lineAmount,
 } from "../domain";
-import { fmtDays, fmtMoney, fmtShort } from "../format";
+import { fmtDays, fmtMoney, fmtShort, fmtStamp } from "../format";
 import type { Invoice, Job, Settings } from "../types";
 
 export interface InvoicePdfInput {
@@ -240,7 +240,7 @@ function draw(doc: PDFKit.PDFDocument, inv: Invoice, job: Job | null, settings: 
   y += 6;
   const when =
     state === "paid" && inv.paidAt
-      ? `Paid ${fmtShort(inv.paidAt.slice(0, 10))}. Thank you.`
+      ? `Paid ${fmtStamp(inv.paidAt)}. Thank you.`
       : `Payment due ${fmtShort(inv.dueOn)} · e-transfer or cheque payable to Crafty.`;
   doc.font("Helvetica").fontSize(9.5).fillColor(INK_2).text(when, MARGIN, y, { width: COL_W });
   y = doc.y + 14;

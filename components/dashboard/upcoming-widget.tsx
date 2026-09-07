@@ -26,9 +26,16 @@ export function UpcomingWidget() {
   const { ws, can, mutate, toast, openModal, openJobPanel } = useWorkspace();
   const upcoming = upcomingJobs(ws.jobs, todayISO());
 
+  /* Sample data seeds a company, a catalogue, a kit and an invoice
+     as well as the jobs, so the route asks for the finances
+     permission and the button follows it. */
   async function loadSample() {
-    await mutate("/api/sample-data");
-    toast("Sample data loaded — check the calendar and finances", "check");
+    try {
+      await mutate("/api/sample-data");
+      toast("Sample data loaded — check the calendar and finances", "check");
+    } catch {
+      /* mutate has already toasted why. */
+    }
   }
 
   return (
@@ -59,7 +66,7 @@ export function UpcomingWidget() {
               ? "Create the first job to get it on the calendar."
               : "Nothing scheduled for you yet."}
           </div>
-          {can("createJob") && !ws.jobs.length && (
+          {can("finances") && !ws.jobs.length && (
             <>
               <div style={{ display: "flex", gap: 8, justifyContent: "center", marginTop: 16 }}>
                 <button type="button" className="btn primary" onClick={() => openModal(<JobForm />)}>

@@ -8,7 +8,7 @@
 import { bad, body, handle, str, strArray } from "@/lib/api";
 import { requirePermission } from "@/lib/auth";
 import { isRole, mayAssignRole } from "@/lib/domain";
-import { getPerson, ownerExists, savePerson } from "@/lib/repo/people";
+import { getPerson, getPersonByEmail, ownerExists, savePerson } from "@/lib/repo/people";
 import type { Role } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -23,6 +23,20 @@ export async function POST(req: Request) {
 
     const name = str(b.name);
     if (!name) bad("Everyone needs a name.");
+
+    /* Email is unique in the table, and savePerson upserts. Without
+       this check, "add employee" with an address already on file
+       would not add anyone — MySQL would resolve the duplicate key
+       against the email and rewrite THAT person's row, name, role and
+       all. Someone could quietly demote the owner by typing their
+       address into the add form. */
+    const email = str(b.email).toLowerCase();
+    if (email) {
+      const holder = await getPersonByEmail(email);
+      if (holder && holder.id !== (existing?.id ?? "")) {
+        bad(`${holder.name} already uses that email address. Edit their record instead.`, 409);
+      }
+    }
 
     // The owner's own record is off limits to moderators: nobody below
     // admin gets to rewrite the owner's name or email.
@@ -54,7 +68,7 @@ export async function POST(req: Request) {
       role,
       position: str(b.position),
       phone: str(b.phone),
-      email: str(b.email).toLowerCase(),
+      email,
       tags: strArray(b.tags),
       dietary: strArray(b.dietary),
     });
