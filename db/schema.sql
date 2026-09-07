@@ -192,6 +192,9 @@ CREATE TABLE IF NOT EXISTS invoices (
   bill_to_email   VARCHAR(190) NOT NULL DEFAULT '',
   attn            VARCHAR(255) NOT NULL DEFAULT '',
   CONSTRAINT fk_invoices_job FOREIGN KEY (job_id) REFERENCES jobs(id) ON DELETE CASCADE,
+  -- Two people drafting at the same moment read the same "next"
+  -- number; this is what stops them both keeping it.
+  UNIQUE KEY uq_invoices_number (number),
   KEY idx_invoices_job (job_id),
   KEY idx_invoices_status (status, due_on)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

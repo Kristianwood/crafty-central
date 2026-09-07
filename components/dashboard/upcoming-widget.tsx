@@ -66,15 +66,20 @@ export function UpcomingWidget() {
               ? "Create the first job to get it on the calendar."
               : "Nothing scheduled for you yet."}
           </div>
-          {can("finances") && !ws.jobs.length && (
+          {can("createJob") && !ws.jobs.length && (
             <>
               <div style={{ display: "flex", gap: 8, justifyContent: "center", marginTop: 16 }}>
                 <button type="button" className="btn primary" onClick={() => openModal(<JobForm />)}>
                   <Icon name="plus" /> New job
                 </button>
-                <button type="button" className="btn" onClick={() => void loadSample()}>
-                  <Icon name="briefcase" /> Load sample data
-                </button>
+                {/* Sample data seeds a company, a catalogue, a kit and an
+                    invoice as well as jobs, so it follows the permission
+                    that owns those. */}
+                {can("finances") && (
+                  <button type="button" className="btn" onClick={() => void loadSample()}>
+                    <Icon name="briefcase" /> Load sample data
+                  </button>
+                )}
               </div>
               <div className="e-sub" style={{ marginTop: 10 }}>
                 Sample data fills the calendar, finances, and chat with three demo jobs so you can

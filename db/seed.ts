@@ -185,7 +185,7 @@ const jobs: SeedJob[] = [
     location: "Revival 629, 629 Eastern Ave",
     callTime: "08:00",
     wrapTime: "17:30",
-    status: "wrapped",
+    status: "invoiced",
     crew: [
       { role: "Assist", personId: "p-tam" },
       { role: "Chef", personId: "p-jun" },

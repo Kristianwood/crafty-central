@@ -500,9 +500,14 @@ function JobSheet({ job: j, dayIdx: rawDayIdx }: { job: Job; dayIdx: number }) {
               ) {
                 return;
               }
-              await mutate(`/api/jobs/${j.id}`, undefined, "DELETE");
-              closePanel();
-              toast("Job deleted", "x");
+              try {
+                await mutate(`/api/jobs/${j.id}`, undefined, "DELETE");
+                closePanel();
+                toast("Job deleted", "x");
+              } catch {
+                /* Refused — an invoice has already gone out on it. The
+                   reason is on screen; the panel stays open. */
+              }
             }}
           >
             <Icon name="x" /> Delete

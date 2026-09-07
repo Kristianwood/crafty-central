@@ -118,12 +118,33 @@ export async function invoicesForJob(jobId: string): Promise<Invoice[]> {
   return assemble(rows, lines);
 }
 
+/** MySQL's duplicate-key error, which here can only be the number. */
+const isDuplicateNumber = (err: unknown): boolean =>
+  !!err && typeof err === "object" && (err as { code?: string }).code === "ER_DUP_ENTRY";
+
 /**
  * Write the header and replace the lines, in one transaction.
  * sentAt / paidAt are written as given, so callers that change
  * status go through markInvoice() rather than this.
+ *
+ * The number is unique in the table, and two people drafting at the
+ * same moment can read the same "next" one. The loser of that race is
+ * given the next number that is actually free rather than an error —
+ * the invoice they asked for still gets made, with a number nobody
+ * else holds.
  */
 export async function saveInvoice(inv: Invoice): Promise<Invoice> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await writeInvoice(inv);
+    } catch (err) {
+      if (!isDuplicateNumber(err) || attempt >= 5) throw err;
+      inv = { ...inv, number: await nextInvoiceNumber(inv.issuedOn.slice(0, 4)) };
+    }
+  }
+}
+
+async function writeInvoice(inv: Invoice): Promise<Invoice> {
   await transaction(async (conn) => {
     await conn.execute(
       `INSERT INTO invoices

@@ -19,7 +19,7 @@ import {
   invoiceDaysOverdue,
   invoiceState,
   invoiceTotal,
-  todayISO,
+  iso,
   type InvoiceState,
 } from "@/lib/domain";
 import { fmtMoney, fmtShort } from "@/lib/format";
@@ -55,7 +55,9 @@ export function InvoicesWidget() {
   const { ws, can, job } = useWorkspace();
   if (!can("finances")) return null;
 
-  const T = todayISO();
+  /* The server's clock, not the browser's: a tablet whose date has
+     drifted must not disagree with Finances about what is overdue. */
+  const T = iso(new Date(ws.now));
   const rows: Row[] = ws.invoices.map((inv) => ({
     inv,
     state: invoiceState(inv, T),

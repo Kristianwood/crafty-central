@@ -370,3 +370,7 @@
 
   .kit-row { grid-template-columns: 1fr 72px auto; }
 }
+
+/* The moment between "draft created" and the snapshot that carries
+   it. Sized so the modal does not jump when the real thing lands. */
+.inv-waiting { min-height: 180px; display: grid; place-items: center; }

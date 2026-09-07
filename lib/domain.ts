@@ -380,7 +380,11 @@ export const kitTotal = (kit: Kit, catalog: CatalogItem[]): number =>
 /** After this long unanswered, a request is nagged about. */
 export const STALE_REQUEST_HOURS = 24;
 
-/** 'yyyy-mm-dd hh:mm:ss' in server-local time → ms. */
+/**
+ * A stored timestamp → ms. Inquiries cross the wire as ISO 8601, so
+ * this is normally just Date.parse; the space-separated MySQL shape is
+ * still accepted for anything read straight off a row on the server.
+ */
 export const parseDateTime = (s: string): number =>
   new Date((s || "").replace(" ", "T")).getTime();
 
@@ -458,9 +462,15 @@ export function defaultDashboard(role: Role): DashboardLayout {
 
 /**
  * Validate a stored (or posted) layout against what this role may
- * see. Unknown or forbidden widgets are dropped, duplicates
- * collapsed, and a layout with nothing left falls back to the
- * default — a dashboard should never come up blank.
+ * see: unknown or forbidden widgets are dropped and duplicates
+ * collapsed.
+ *
+ * An empty list is only replaced by the default when the layout did
+ * not carry one at all — a missing or malformed field, which is the
+ * case the fallback is for. Someone who deliberately unticks every
+ * stat tile, or hides every widget, gets what they asked for and the
+ * "add a widget" tray to change their mind with; saying "saved" and
+ * quietly putting the defaults back would be a lie.
  */
 export function normalizeDashboard(raw: unknown, role: Role): DashboardLayout {
   const base = defaultDashboard(role);
@@ -468,6 +478,13 @@ export function normalizeDashboard(raw: unknown, role: Role): DashboardLayout {
   const r = raw as Partial<DashboardLayout>;
   const allowed = new Set(widgetsFor(role).map((w) => w.id));
   const allowedStats = new Set(statTilesFor(role).map((s) => s.id));
+
+  /* "Empty because they emptied it" and "empty because their role no
+     longer allows any of it" are different answers. Only the first is
+     honoured; the second falls back to the default, because a
+     demotion should not be how someone's dashboard goes blank. */
+  const askedWidgets = Array.isArray(r.widgets) ? r.widgets.length : -1;
+  const askedStats = Array.isArray(r.stats) ? r.stats.length : -1;
 
   const seen = new Set<WidgetId>();
   const widgets: DashboardWidget[] = [];
@@ -488,8 +505,8 @@ export function normalizeDashboard(raw: unknown, role: Role): DashboardLayout {
   const notes = typeof r.notes === "string" ? r.notes.slice(0, 4000) : "";
 
   return {
-    widgets: widgets.length ? widgets : base.widgets,
-    stats: stats.length ? stats.slice(0, MAX_STAT_TILES) : base.stats,
+    widgets: widgets.length || askedWidgets === 0 ? widgets : base.widgets,
+    stats: stats.length || askedStats === 0 ? stats.slice(0, MAX_STAT_TILES) : base.stats,
     notes,
   };
 }

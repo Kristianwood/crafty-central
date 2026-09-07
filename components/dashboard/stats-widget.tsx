@@ -22,7 +22,7 @@ import {
   STALE_REQUEST_HOURS,
   STAT_TILES,
   statTilesFor,
-  todayISO,
+  iso,
   unansweredRequests,
   MAX_STAT_TILES,
 } from "@/lib/domain";
@@ -51,7 +51,9 @@ const whole = (n: number) => fmtMoney(n).replace(/\.00$/, "");
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
 function tileFor(id: StatId, ws: Workspace, jobOf: (id: string) => Job | undefined): Tile {
-  const T = todayISO();
+  /* The server's clock, not the browser's: a tablet whose date has
+     drifted must not disagree with Finances about what is overdue. */
+  const T = iso(new Date(ws.now));
   const label = STAT_TILES.find((s) => s.id === id)?.label ?? id;
 
   switch (id) {

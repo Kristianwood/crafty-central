@@ -118,6 +118,104 @@ const PATCHES: Patch[] = [
     apply: `ALTER TABLE invoices ADD KEY idx_invoices_status (status, due_on)`,
   },
   {
+    /* Invoice numbers are minted by reading the ones already taken,
+       which two requests can do at the same moment. The index is what
+       actually stops a duplicate; nextInvoiceNumber() then retries.
+       It is added only when the table is already clean — a database
+       that somehow has duplicates should be looked at by a person
+       rather than have the migration fail in front of them. */
+    name: "invoices uq_invoices_number",
+    applied: async (db, schema) => {
+      if (await indexExists(db, schema, "invoices", "uq_invoices_number")) return true;
+      const [dupes] = await db.query<mysql.RowDataPacket[]>(
+        "SELECT number, COUNT(*) n FROM invoices GROUP BY number HAVING n > 1",
+      );
+      if (dupes.length) {
+        console.log(
+          `  skipped: invoices.number is not unique yet (${dupes
+            .map((d) => d.number)
+            .join(", ")}). Renumber those, then run this again.`,
+        );
+        return true;
+      }
+      return false;
+    },
+    apply: "ALTER TABLE invoices ADD UNIQUE KEY uq_invoices_number (number)",
+  },
+  {
+    /* Freeze what pre-1.2 invoices charge.
+
+       Before 1.2 an invoice had no lines: it was priced from its job
+       every time anyone looked at it, so editing a wrapped job changed
+       an invoice that had already gone out. The domain still falls
+       back to that for an invoice with no lines, which keeps the value
+       identical on the day of the upgrade — but leaving it there would
+       leave every old invoice live-priced forever. So each one is
+       given the two lines its job priced out to at this moment, and
+       from here on it says what it said when it was sent.
+
+       The maths is defaultInvoiceLines() in SQL: covers are summed per
+       shoot day honouring the per-day headcount override, a job with
+       no days counts as one day, and a NULL rate falls back to the
+       settings row. */
+    name: "invoice_lines backfill for pre-1.2 invoices",
+    applied: async (db) => {
+      const [rows] = await db.query<mysql.RowDataPacket[]>(
+        `SELECT 1 FROM invoices i
+          WHERE NOT EXISTS (SELECT 1 FROM invoice_lines l WHERE l.invoice_id = i.id)
+          LIMIT 1`,
+      );
+      return rows.length === 0;
+    },
+    apply: `INSERT INTO invoice_lines (invoice_id, position, description, qty, unit, unit_price)
+            SELECT p.id, n.position,
+                   CASE n.position
+                     WHEN 0 THEN CONCAT('Full craft service — ', p.production_name)
+                     ELSE 'Truck & crew day rate'
+                   END,
+                   CASE n.position WHEN 0 THEN p.covers ELSE p.days END,
+                   CASE n.position WHEN 0 THEN 'covers' ELSE 'days' END,
+                   CASE n.position WHEN 0 THEN p.per_head ELSE p.truck_day END
+              FROM (
+                SELECT i.id, j.production_name,
+                       COALESCE((SELECT SUM(COALESCE(d.headcount, j.headcount))
+                                   FROM job_days d WHERE d.job_id = j.id), 0) AS covers,
+                       GREATEST((SELECT COUNT(*) FROM job_days d WHERE d.job_id = j.id), 1) AS days,
+                       COALESCE(j.rate_per_head, s.per_head_default) AS per_head,
+                       COALESCE(j.rate_truck_day, s.truck_day_default) AS truck_day
+                  FROM invoices i
+                  JOIN jobs j ON j.id = i.job_id
+                  CROSS JOIN (SELECT per_head_default, truck_day_default FROM settings WHERE id = 1) s
+                 WHERE NOT EXISTS (SELECT 1 FROM invoice_lines l WHERE l.invoice_id = i.id)
+              ) p
+              CROSS JOIN (SELECT 0 AS position UNION ALL SELECT 1) n`,
+  },
+  {
+    /* And the bill-to block, from the production company on file.
+       Jobs name their company as free text, so it is matched the same
+       trimmed, case-insensitive way findCompanyByName() does. An
+       invoice whose company is not in the book keeps the job's name
+       and an empty address, which is what the screen showed before. */
+    name: "invoices bill-to snapshot backfill",
+    applied: async (db) => {
+      const [rows] = await db.query<mysql.RowDataPacket[]>(
+        "SELECT 1 FROM invoices WHERE bill_to_name = '' LIMIT 1",
+      );
+      return rows.length === 0;
+    },
+    apply: `UPDATE invoices i
+              JOIN jobs j ON j.id = i.job_id
+              LEFT JOIN companies c
+                ON LOWER(TRIM(c.name)) = LOWER(TRIM(j.production_company))
+               SET i.bill_to_name = COALESCE(NULLIF(c.name, ''), j.production_company),
+                   i.bill_to_address = COALESCE(c.billing_address, ''),
+                   i.bill_to_email = COALESCE(c.email, ''),
+                   i.attn = TRIM(BOTH ' · ' FROM CONCAT_WS(' · ',
+                              NULLIF(CONCAT(j.pm, CASE WHEN j.pm <> '' THEN ' (PM)' ELSE '' END), ''),
+                              NULLIF(j.producers, '')))
+             WHERE i.bill_to_name = ''`,
+  },
+  {
     // Invoices already marked sent/paid before the timestamps existed
     // get their issue date as the best available "sent" time, so the
     // tracking view has something honest to show.
@@ -146,6 +244,8 @@ async function main() {
     user: c.user,
     password: c.password,
     multipleStatements: true,
+    // The backfill writes an em dash into a description; say so.
+    charset: "utf8mb4",
   });
 
   await server.query(

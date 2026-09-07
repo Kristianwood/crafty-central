@@ -8,7 +8,7 @@
    the catalogue and kits live in ./catalog.ts.
    ============================================================ */
 
-import { execute, jsonArray, mysqlDateTime, query, queryOne, transaction } from "../db";
+import { execute, isoDateTime, jsonArray, mysqlDateTime, query, queryOne, transaction } from "../db";
 import { STALE_REQUEST_HOURS, parseDateTime, uid } from "../domain";
 import { fmtAgo } from "../format";
 import {
@@ -204,7 +204,9 @@ export async function listInquiries(): Promise<Inquiry[]> {
         shootDays: [] as string[],
         notes: r.notes,
         status: r.status,
-        createdAt: r.created_at,
+        /* ISO, so the browser reads an instant rather than a
+           wall-clock string it would have to assume was its own. */
+        createdAt: isoDateTime(r.created_at) ?? r.created_at,
       } satisfies Inquiry,
     ]),
   );
@@ -225,7 +227,7 @@ export async function saveInquiry(input: Partial<Inquiry>): Promise<Inquiry> {
     shootDays: (input.shootDays || []).slice().sort(),
     notes: input.notes || "",
     status: input.status || "new",
-    createdAt: input.createdAt || mysqlDateTime(),
+    createdAt: input.createdAt || new Date().toISOString(),
   };
   await transaction(async (conn) => {
     await conn.execute(
@@ -247,7 +249,7 @@ export async function saveInquiry(input: Partial<Inquiry>): Promise<Inquiry> {
         q.headcount,
         q.notes,
         q.status,
-        q.createdAt,
+        mysqlDateTime(new Date(q.createdAt)),
       ],
     );
     await conn.execute("DELETE FROM inquiry_days WHERE inquiry_id = ?", [q.id]);

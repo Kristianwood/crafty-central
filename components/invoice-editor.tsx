@@ -20,7 +20,7 @@
    archived PDF — with the few things that can still happen to it.
    ============================================================ */
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
   catalogLine,
@@ -43,15 +43,39 @@ import { Icon } from "./icons";
 import { useWorkspace } from "./workspace-provider";
 
 export function InvoiceEditor({ invoiceId }: { invoiceId: string }) {
-  const { ws, job, closeModal } = useWorkspace();
+  const { ws, job, refresh, closeModal } = useWorkspace();
   const inv = ws.invoices.find((i) => i.id === invoiceId);
 
-  /* Gone from the snapshot means gone for good; nothing to edit. */
-  useEffect(() => {
-    if (!inv) closeModal();
-  }, [inv, closeModal]);
+  /* An invoice that was here and then vanished has been deleted, and
+     there is nothing left to edit. One that has never been here is a
+     different thing: the modal is usually opened the instant a draft
+     is created, and the refresh carrying it can lose a race with the
+     8s poll that aborts it. Closing on that would look like the
+     button did nothing, so it waits and asks for the snapshot again. */
+  const seen = useRef(false);
 
-  if (!inv) return null;
+  useEffect(() => {
+    if (inv) {
+      seen.current = true;
+      return;
+    }
+    if (seen.current) {
+      closeModal();
+      return;
+    }
+    void refresh();
+  }, [inv, refresh, closeModal]);
+
+  if (!inv) {
+    return (
+      <div className="inv-editor inv-waiting">
+        <div className="auth-loading">
+          <span className="auth-spinner" aria-hidden="true" />
+          Opening the invoice…
+        </div>
+      </div>
+    );
+  }
   const j = job(inv.jobId);
 
   /* Keyed on the id so a different invoice never inherits this
