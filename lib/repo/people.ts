@@ -112,3 +112,12 @@ export async function peopleCount(): Promise<number> {
   const rows = await query<{ n: number }>("SELECT COUNT(*) AS n FROM people");
   return Number(rows[0]?.n ?? 0);
 }
+
+/** Is the owner seat taken? Decides whether an admin may still claim it for someone. */
+export async function ownerExists(excludingId?: string): Promise<boolean> {
+  const rows = await query<{ n: number }>(
+    "SELECT COUNT(*) AS n FROM people WHERE role = 'owner' AND id <> ?",
+    [excludingId ?? ""],
+  );
+  return Number(rows[0]?.n ?? 0) > 0;
+}

@@ -1,16 +1,17 @@
-/* Directory entries. Role changes are admin-only: a moderator can
-   keep the book tidy but cannot promote anyone, themselves least
-   of all. */
+/* Directory entries. Role changes are gated by mayAssignRole() in
+   lib/domain.ts: admins and the owner set roles, but only the owner
+   hands out or takes back the owner seat — with one exception,
+   while nobody holds it yet an admin may give it to one person, so
+   the business owner can be seated on an existing database from the
+   Directory rather than a console. */
 
 import { bad, body, handle, str, strArray } from "@/lib/api";
 import { requirePermission } from "@/lib/auth";
-import { can } from "@/lib/domain";
-import { getPerson, savePerson } from "@/lib/repo/people";
+import { isRole, mayAssignRole } from "@/lib/domain";
+import { getPerson, ownerExists, savePerson } from "@/lib/repo/people";
 import type { Role } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
-
-const ROLES: Role[] = ["admin", "moderator", "crew"];
 
 export async function POST(req: Request) {
   return handle(async () => {
@@ -18,20 +19,33 @@ export async function POST(req: Request) {
     const b = await body(req);
     const id = str(b.id);
     const existing = id ? await getPerson(id) : null;
+    if (id && !existing) bad("That person is gone.", 404);
 
     const name = str(b.name);
     if (!name) bad("Everyone needs a name.");
 
-    let role = (str(b.role) || existing?.role || "crew") as Role;
-    if (!ROLES.includes(role)) role = "crew";
-
-    // Only an admin can set or change a role.
-    if (!can(me.role, "finances") && role !== (existing?.role ?? "crew")) {
-      bad("Only an admin can change someone's role.", 403);
+    // The owner's own record is off limits to moderators: nobody below
+    // admin gets to rewrite the owner's name or email.
+    if (existing?.role === "owner" && existing.id !== me.id && me.role === "moderator") {
+      bad("Only an admin or the owner can edit the owner's record.", 403);
     }
-    // And nobody demotes the last admin out of existence by accident.
-    if (existing?.id === me.id && role !== me.role) {
-      bad("Change your own role from another admin account.", 403);
+
+    const requested = str(b.role);
+    const role: Role = isRole(requested) ? requested : (existing?.role ?? "crew");
+    const current = existing?.role ?? null;
+
+    if (role !== (current ?? "crew")) {
+      // Nobody changes their own role — not even the owner, so the
+      // seat cannot be given away by accident.
+      if (existing?.id === me.id) bad("Change your own role from another account.", 403);
+      if (!mayAssignRole(me.role, current, role, await ownerExists(existing?.id))) {
+        bad(
+          role === "owner" || current === "owner"
+            ? "Only the owner can change who holds the owner seat."
+            : "Only an admin can change someone's role.",
+          403,
+        );
+      }
     }
 
     const person = await savePerson({

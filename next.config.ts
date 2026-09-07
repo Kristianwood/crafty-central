@@ -5,6 +5,12 @@ const nextConfig: NextConfig = {
   // place and restarts the app, so nothing here needs to know about deploys.
   reactStrictMode: true,
 
+  // pdfkit reads its built-in font metrics (Helvetica.afm and friends) from
+  // its own package directory at runtime. Bundling it would strip those files
+  // and the first invoice PDF would fail with ENOENT, so it is required from
+  // node_modules as-is instead.
+  serverExternalPackages: ["pdfkit"],
+
   // Dev only. Next refuses to serve /_next/static chunks to a page loaded from
   // a host it does not recognise, which is a sensible default and a baffling
   // symptom: the page renders from server HTML, the scripts are blocked, React

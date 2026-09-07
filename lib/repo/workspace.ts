@@ -10,26 +10,33 @@
    This is what the client polls.
    ============================================================ */
 
-import { can } from "../domain";
+import { can, defaultDashboard, visibleJobs } from "../domain";
 import type { Person, Workspace } from "../types";
 import { listJobs } from "./jobs";
 import { myNotifications } from "./notifications";
 import { unreadChannels } from "./chat";
 import { listPeople } from "./people";
+import { listInvoices } from "./invoices";
+import { listCatalog, listKits } from "./catalog";
+import { getDashboard } from "./dashboard";
 import {
   getSettings,
   listCompanies,
   listInquiries,
-  listInvoices,
   listMenus,
   listSetCrew,
   listTimeOff,
+  remindStaleRequests,
 } from "./misc";
-import { visibleJobs } from "../domain";
 
 export async function loadWorkspace(me: Person): Promise<Workspace> {
   const seesMoney = can(me.role, "finances");
   const seesEveryone = can(me.role, "seeAllJobs");
+
+  // The office is the audience for "still unanswered" reminders, so
+  // their own poll is what sends them. Best-effort: a failure here
+  // must never take the whole workspace down with it.
+  if (seesEveryone) await remindStaleRequests().catch(() => 0);
 
   const [
     people,
@@ -39,10 +46,13 @@ export async function loadWorkspace(me: Person): Promise<Workspace> {
     setCrew,
     inquiries,
     invoices,
+    catalog,
+    kits,
     timeOff,
     notifications,
     settings,
     unread,
+    dashboard,
   ] = await Promise.all([
     listPeople(),
     listJobs(),
@@ -51,10 +61,15 @@ export async function loadWorkspace(me: Person): Promise<Workspace> {
     listSetCrew(),
     seesEveryone ? listInquiries() : Promise.resolve([]),
     seesMoney ? listInvoices() : Promise.resolve([]),
+    seesMoney ? listCatalog() : Promise.resolve([]),
+    seesMoney ? listKits() : Promise.resolve([]),
     listTimeOff(),
     myNotifications(me.id, me.role),
     getSettings(),
     unreadChannels(me.id),
+    can(me.role, "customizeDashboard")
+      ? getDashboard(me.id, me.role)
+      : Promise.resolve(defaultDashboard(me.role)),
   ]);
 
   return {
@@ -66,6 +81,8 @@ export async function loadWorkspace(me: Person): Promise<Workspace> {
     setCrew,
     inquiries,
     invoices,
+    catalog,
+    kits,
     // Crew see only their own requests; anyone who can approve sees all.
     timeOff: can(me.role, "approveTimeOff")
       ? timeOff
@@ -73,5 +90,7 @@ export async function loadWorkspace(me: Person): Promise<Workspace> {
     notifications,
     unreadChannels: unread,
     settings,
+    dashboard,
+    now: Date.now(),
   };
 }

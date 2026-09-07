@@ -9,14 +9,24 @@
 
 import {
   DEFAULT_SETTINGS,
+  ROLES,
+  type CatalogItem,
   type CrewSlot,
+  type DashboardLayout,
+  type DashboardWidget,
   type DayInfo,
+  type Inquiry,
   type Invoice,
+  type InvoiceLine,
   type Job,
+  type Kit,
   type Person,
   type Role,
   type Settings,
+  type StatId,
   type TimeOff,
+  type WidgetId,
+  type WidgetSize,
 } from "./types";
 
 /* ---------- ids ---------- */
@@ -44,7 +54,19 @@ export function addDays(isoStr: string, n: number): string {
   return iso(d);
 }
 
-/* ---------- permissions ---------- */
+/* ---------- roles & permissions ---------- */
+
+/** Lower rank = more power. */
+export const ROLE_RANK: Record<Role, number> = { owner: 0, admin: 1, moderator: 2, crew: 3 };
+
+export const isRole = (v: unknown): v is Role => ROLES.includes(v as Role);
+
+export const ROLE_LABELS: Record<Role, string> = {
+  owner: "Owner",
+  admin: "Admin",
+  moderator: "Moderator",
+  crew: "Crew",
+};
 
 export type Permission =
   | "finances"
@@ -53,20 +75,55 @@ export type Permission =
   | "assignCrew"
   | "approveTimeOff"
   | "editDirectory"
-  | "seeAllJobs";
+  | "seeAllJobs"
+  | "manageRoles"
+  | "grantOwner"
+  | "manageCatalog"
+  | "customizeDashboard";
+
+const ADMIN_UP: Role[] = ["owner", "admin"];
+const MODERATOR_UP: Role[] = ["owner", "admin", "moderator"];
 
 const PERMISSIONS: Record<Permission, Role[]> = {
-  finances: ["admin"],
-  createJob: ["admin", "moderator"],
-  editJob: ["admin", "moderator"],
-  assignCrew: ["admin", "moderator"],
-  approveTimeOff: ["admin", "moderator"],
-  editDirectory: ["admin", "moderator"],
-  seeAllJobs: ["admin", "moderator"],
+  finances: ADMIN_UP,
+  createJob: MODERATOR_UP,
+  editJob: MODERATOR_UP,
+  assignCrew: MODERATOR_UP,
+  approveTimeOff: MODERATOR_UP,
+  editDirectory: MODERATOR_UP,
+  seeAllJobs: MODERATOR_UP,
+  /** Set someone's role (owner seat excluded — see grantOwner). */
+  manageRoles: ADMIN_UP,
+  /** Hand out or take back the owner seat. Owner only. */
+  grantOwner: ["owner"],
+  /** Products, services and kits. Priced, so it goes with finances. */
+  manageCatalog: ADMIN_UP,
+  /** Anyone who has a dashboard may arrange it. */
+  customizeDashboard: MODERATOR_UP,
 };
 
 export const can = (role: Role, perm: Permission): boolean =>
   PERMISSIONS[perm].includes(role);
+
+/**
+ * May `actor` set `target` to `next`? Admins manage roles below
+ * owner; only an owner grants or revokes the owner seat — except
+ * that while nobody is owner yet, an admin may claim it for the
+ * business owner (that is how Taso gets the seat on an existing
+ * database without a console session).
+ */
+export function mayAssignRole(
+  actor: Role,
+  current: Role | null,
+  next: Role,
+  ownerExists: boolean,
+): boolean {
+  if (!can(actor, "manageRoles")) return false;
+  const touchesOwner = next === "owner" || current === "owner";
+  if (!touchesOwner) return true;
+  if (can(actor, "grantOwner")) return true;
+  return next === "owner" && !ownerExists;
+}
 
 /* ---------- crew-role tags ----------
    Inferred once from a person's position when a record has no tags
@@ -201,6 +258,8 @@ export const hasTimeOff = (timeOff: TimeOff[], personId: string, days: string[])
 
 /* ---------- money ---------- */
 
+export const round2 = (n: number): number => Math.round((n + Number.EPSILON) * 100) / 100;
+
 export function jobSubtotal(j: Job, settings: Settings = DEFAULT_SETTINGS): number {
   const days = j.shootDays.length || 1;
   const perHead = j.rates?.perHead ?? settings.perHeadDefault;
@@ -208,13 +267,228 @@ export function jobSubtotal(j: Job, settings: Settings = DEFAULT_SETTINGS): numb
   return totalCovers(j) * perHead + truckDay * days;
 }
 
+/** Ontario HST; the rate every new invoice starts on. */
+export const DEFAULT_TAX_RATE = 0.13;
+
+/**
+ * The two lines every job prices out to — covers × per-head, and
+ * the truck by the day. New invoices start with these; invoices
+ * drafted before lines existed are priced from them on the fly.
+ */
+export function defaultInvoiceLines(j: Job, settings: Settings = DEFAULT_SETTINGS): InvoiceLine[] {
+  const days = j.shootDays.length || 1;
+  const perHead = j.rates?.perHead ?? settings.perHeadDefault;
+  const truckDay = j.rates?.truckDay ?? settings.truckDayDefault;
+  return [
+    {
+      description: `Full craft service — ${j.productionName}`,
+      qty: totalCovers(j),
+      unit: "covers",
+      unitPrice: perHead,
+    },
+    { description: "Truck & crew day rate", qty: days, unit: "days", unitPrice: truckDay },
+  ];
+}
+
+export const lineAmount = (l: InvoiceLine): number => round2((Number(l.qty) || 0) * (Number(l.unitPrice) || 0));
+
+/** The lines an invoice prices from: its own, or the job's if it has none. */
+export function invoiceLines(
+  inv: Invoice,
+  job: Job | undefined,
+  settings: Settings = DEFAULT_SETTINGS,
+): InvoiceLine[] {
+  if (inv.lines?.length) return inv.lines;
+  return job ? defaultInvoiceLines(job, settings) : [];
+}
+
+export const invoiceSubtotal = (
+  inv: Invoice,
+  job: Job | undefined,
+  settings: Settings = DEFAULT_SETTINGS,
+): number => round2(invoiceLines(inv, job, settings).reduce((s, l) => s + lineAmount(l), 0));
+
+export const invoiceTax = (
+  inv: Invoice,
+  job: Job | undefined,
+  settings: Settings = DEFAULT_SETTINGS,
+): number => round2(invoiceSubtotal(inv, job, settings) * (inv.taxRate ?? DEFAULT_TAX_RATE));
+
 export function invoiceTotal(
   inv: Invoice,
   job: Job | undefined,
   settings: Settings = DEFAULT_SETTINGS,
 ): number {
-  if (!job) return 0;
-  return jobSubtotal(job, settings) * (1 + (inv.taxRate ?? 0.13));
+  return round2(invoiceSubtotal(inv, job, settings) + invoiceTax(inv, job, settings));
+}
+
+/** Where an invoice is in its life: overdue is a sent one past its due date. */
+export type InvoiceState = "draft" | "sent" | "overdue" | "paid";
+
+export function invoiceState(inv: Invoice, today: string = todayISO()): InvoiceState {
+  if (inv.status === "paid") return "paid";
+  if (inv.status === "sent") return inv.dueOn < today ? "overdue" : "sent";
+  return "draft";
+}
+
+/** Days past due (positive) or until due (negative) for a sent invoice. */
+export function invoiceDaysOverdue(inv: Invoice, today: string = todayISO()): number {
+  const a = new Date(inv.dueOn + "T00:00:00").getTime();
+  const b = new Date(today + "T00:00:00").getTime();
+  return Math.round((b - a) / 86400_000);
+}
+
+/** Lines are frozen once the invoice has gone out. */
+export const invoiceEditable = (inv: Invoice): boolean => inv.status === "draft";
+
+export const invoiceNumber = (year: string, n: number): string =>
+  `CR-${year}-${String(n).padStart(3, "0")}`;
+
+/** A kit expanded against the catalogue. Items since deleted are skipped. */
+export function kitLines(kit: Kit, catalog: CatalogItem[]): InvoiceLine[] {
+  const out: InvoiceLine[] = [];
+  for (const it of kit.items) {
+    const item = catalog.find((c) => c.id === it.catalogItemId);
+    if (!item) continue;
+    out.push({
+      description: item.name,
+      qty: Number(it.qty) || 1,
+      unit: item.unit,
+      unitPrice: item.unitPrice,
+      catalogItemId: item.id,
+      kitId: kit.id,
+    });
+  }
+  return out;
+}
+
+export const catalogLine = (item: CatalogItem, qty = 1): InvoiceLine => ({
+  description: item.name,
+  qty,
+  unit: item.unit,
+  unitPrice: item.unitPrice,
+  catalogItemId: item.id,
+  kitId: null,
+});
+
+/** What a kit adds up to, before tax. */
+export const kitTotal = (kit: Kit, catalog: CatalogItem[]): number =>
+  round2(kitLines(kit, catalog).reduce((s, l) => s + lineAmount(l), 0));
+
+/* ---------- job requests (outreach enquiries) ---------- */
+
+/** After this long unanswered, a request is nagged about. */
+export const STALE_REQUEST_HOURS = 24;
+
+/** 'yyyy-mm-dd hh:mm:ss' in server-local time → ms. */
+export const parseDateTime = (s: string): number =>
+  new Date((s || "").replace(" ", "T")).getTime();
+
+export const inquiryAgeHours = (q: Inquiry, now: number): number =>
+  Math.max(0, (now - parseDateTime(q.createdAt)) / 3600_000);
+
+/** Unanswered requests, oldest first — the ones still owed a reply. */
+export const unansweredRequests = (inquiries: Inquiry[]): Inquiry[] =>
+  inquiries
+    .filter((q) => q.status === "new")
+    .sort((a, b) => (a.createdAt || "").localeCompare(b.createdAt || ""));
+
+export const isStaleRequest = (q: Inquiry, now: number): boolean =>
+  inquiryAgeHours(q, now) >= STALE_REQUEST_HOURS;
+
+/* ---------- dashboard ---------- */
+
+export interface WidgetDef {
+  id: WidgetId;
+  label: string;
+  hint: string;
+  /** Hidden from anyone without this permission. */
+  needs?: Permission;
+  defaultSize: WidgetSize;
+}
+
+export const WIDGETS: WidgetDef[] = [
+  { id: "stats", label: "At a glance", hint: "The numbers that matter this week.", defaultSize: "full" },
+  { id: "requests", label: "Job requests", hint: "Enquiries from the outreach form that nobody has answered.", needs: "createJob", defaultSize: "full" },
+  { id: "today", label: "On the truck today", hint: "Today's shoot days — call times, crew and location.", defaultSize: "half" },
+  { id: "invoices", label: "Invoice tracking", hint: "What is overdue, what is waiting on payment, what is still a draft.", needs: "finances", defaultSize: "half" },
+  { id: "upcoming", label: "Upcoming jobs", hint: "Everything on the books from today onward.", defaultSize: "full" },
+  { id: "timeoff", label: "Time-off requests", hint: "Approve or deny — the crew member is notified either way.", needs: "approveTimeOff", defaultSize: "half" },
+  { id: "notes", label: "My notes", hint: "A scratchpad only you can see.", defaultSize: "half" },
+  { id: "workload", label: "Crew workload", hint: "Booked days from today onward.", needs: "assignCrew", defaultSize: "full" },
+];
+
+export interface StatDef {
+  id: StatId;
+  label: string;
+  needs?: Permission;
+}
+
+export const STAT_TILES: StatDef[] = [
+  { id: "jobsWeek", label: "Jobs this week" },
+  { id: "covers", label: "Meals to plan · 7 days" },
+  { id: "attention", label: "Needs attention" },
+  { id: "requests", label: "Unanswered requests", needs: "createJob" },
+  { id: "timeoff", label: "Time-off requests", needs: "approveTimeOff" },
+  { id: "pipeline", label: "Open pipeline", needs: "finances" },
+  { id: "outstanding", label: "Outstanding invoices", needs: "finances" },
+  { id: "overdue", label: "Overdue invoices", needs: "finances" },
+];
+
+export const widgetDef = (id: WidgetId): WidgetDef | undefined => WIDGETS.find((w) => w.id === id);
+
+export const widgetsFor = (role: Role): WidgetDef[] =>
+  WIDGETS.filter((w) => !w.needs || can(role, w.needs));
+
+export const statTilesFor = (role: Role): StatDef[] =>
+  STAT_TILES.filter((s) => !s.needs || can(role, s.needs));
+
+/** What a fresh account sees, by role. */
+export function defaultDashboard(role: Role): DashboardLayout {
+  const money = can(role, "finances");
+  const widgets: DashboardWidget[] = widgetsFor(role).map((w) => ({ id: w.id, size: w.defaultSize }));
+  const stats: StatId[] = money
+    ? ["jobsWeek", "covers", "requests", "outstanding"]
+    : ["jobsWeek", "covers", "attention", "requests"];
+  return { widgets, stats: stats.filter((s) => statTilesFor(role).some((t) => t.id === s)), notes: "" };
+}
+
+/**
+ * Validate a stored (or posted) layout against what this role may
+ * see. Unknown or forbidden widgets are dropped, duplicates
+ * collapsed, and a layout with nothing left falls back to the
+ * default — a dashboard should never come up blank.
+ */
+export function normalizeDashboard(raw: unknown, role: Role): DashboardLayout {
+  const base = defaultDashboard(role);
+  if (!raw || typeof raw !== "object") return base;
+  const r = raw as Partial<DashboardLayout>;
+  const allowed = new Set(widgetsFor(role).map((w) => w.id));
+  const allowedStats = new Set(statTilesFor(role).map((s) => s.id));
+
+  const seen = new Set<WidgetId>();
+  const widgets: DashboardWidget[] = [];
+  for (const w of Array.isArray(r.widgets) ? r.widgets : []) {
+    if (!w || typeof w !== "object") continue;
+    const id = (w as DashboardWidget).id;
+    if (!allowed.has(id) || seen.has(id)) continue;
+    seen.add(id);
+    const size: WidgetSize = (w as DashboardWidget).size === "half" ? "half" : "full";
+    widgets.push({ id, size });
+  }
+
+  const stats: StatId[] = [];
+  for (const s of Array.isArray(r.stats) ? r.stats : []) {
+    if (allowedStats.has(s as StatId) && !stats.includes(s as StatId)) stats.push(s as StatId);
+  }
+
+  const notes = typeof r.notes === "string" ? r.notes.slice(0, 4000) : "";
+
+  return {
+    widgets: widgets.length ? widgets : base.widgets,
+    stats: stats.length ? stats.slice(0, 6) : base.stats,
+    notes,
+  };
 }
 
 /* ---------- chat ---------- */
@@ -247,14 +521,29 @@ export function dmPartnerId(channel: string, myId: string): string | null {
 
 /* ---------- notifications ---------- */
 
+/**
+ * The role audiences a person receives. Anything addressed to the
+ * office ("moderator") reaches admins and the owner too; anything
+ * addressed to admins reaches the owner. Crew hear only "crew".
+ */
+export function notificationAudiences(role: Role): string[] {
+  switch (role) {
+    case "owner":
+      return ["owner", "admin", "moderator"];
+    case "admin":
+      return ["admin", "moderator"];
+    default:
+      return [role];
+  }
+}
+
 export const notificationIsMine = (
   audience: string,
   role: Role,
   myId: string,
 ): boolean =>
   audience === "all" ||
-  audience === role ||
-  (audience === "moderator" && role === "admin") ||
+  notificationAudiences(role).includes(audience) ||
   audience === "person:" + myId;
 
 /* ---------- day reconciliation ----------

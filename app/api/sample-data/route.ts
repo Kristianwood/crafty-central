@@ -6,25 +6,19 @@
    hand — and deleting it is just deleting jobs. It shows off the
    parts of the app that are hard to notice on an empty screen: a
    fully-dressed confirmed job, an estimate with missing-info
-   flags, and a wrapped job with an invoice behind it.
+   flags, a wrapped job with an invoice behind it, and a small
+   catalogue with a kit ready to drop onto the next invoice.
    ============================================================ */
 
 import { bad, handle } from "@/lib/api";
 import { requirePermission } from "@/lib/auth";
-import { addDays, todayISO, uid } from "@/lib/domain";
-import { listJobs, newJobId, saveJob } from "@/lib/repo/jobs";
+import { DEFAULT_TAX_RATE, addDays, defaultInvoiceLines, todayISO, uid } from "@/lib/domain";
+import { listJobs, newJobId, saveJob, setJobStatus } from "@/lib/repo/jobs";
 import { insertMessage } from "@/lib/repo/chat";
 import { notify } from "@/lib/repo/notifications";
-import {
-  getSettings,
-  invoiceCount,
-  listCompanies,
-  listMenus,
-  saveCompany,
-  saveInvoice,
-  saveMenu,
-} from "@/lib/repo/misc";
-import { setJobStatus } from "@/lib/repo/jobs";
+import { listCatalog, listKits, saveCatalogItem, saveKit } from "@/lib/repo/catalog";
+import { nextInvoiceNumber, saveInvoice } from "@/lib/repo/invoices";
+import { getSettings, listCompanies, listMenus, saveCompany, saveMenu } from "@/lib/repo/misc";
 
 export const dynamic = "force-dynamic";
 
@@ -52,14 +46,66 @@ export async function POST() {
     }
 
     const companies = await listCompanies();
-    if (!companies.some((c) => c.name === "Bluewater Films")) {
-      await saveCompany({
+    let company = companies.find((c) => c.name === "Bluewater Films");
+    if (!company) {
+      company = await saveCompany({
         name: "Bluewater Films",
         billingAddress: "55 Commissioners St, Unit 12\nToronto ON M5A 1A6",
         contactName: "Ines Delacroix-Ma",
         email: "ap@bluewaterfilms.ca",
         phone: "+1 (416) 555-0182",
       });
+    }
+
+    /* A small catalogue and one kit, so the invoice builder has
+       something to drop in. Skipped if the office already built one. */
+    if (!(await listCatalog()).length) {
+      const espresso = await saveCatalogItem({
+        name: "Espresso bar service",
+        kind: "service",
+        unit: "day",
+        unitPrice: 275,
+        description: "Barista, machine, milks and syrups for the day.",
+      });
+      const smoothie = await saveCatalogItem({
+        name: "Smoothie run",
+        kind: "service",
+        unit: "run",
+        unitPrice: 180,
+        description: "Mid-afternoon fresh smoothies for the whole crew.",
+      });
+      const substantial = await saveCatalogItem({
+        name: "Extra substantial",
+        kind: "product",
+        unit: "cover",
+        unitPrice: 6.5,
+        description: "One additional hot substantial per head.",
+      });
+      await saveCatalogItem({
+        name: "Late-wrap dinner",
+        kind: "product",
+        unit: "cover",
+        unitPrice: 19,
+        description: "Hot dinner service when wrap runs past 8 PM.",
+      });
+      await saveCatalogItem({
+        name: "Second truck",
+        kind: "service",
+        unit: "day",
+        unitPrice: 650,
+        description: "A second unit for company moves or split units.",
+      });
+      if (!(await listKits()).length) {
+        await saveKit({
+          name: "Golden-hour add-on",
+          description: "Espresso bar plus a smoothie run and an extra substantial for everyone.",
+          items: [
+            { catalogItemId: espresso.id, qty: 1 },
+            { catalogItemId: smoothie.id, qty: 1 },
+            { catalogItemId: substantial.id, qty: 30 },
+          ],
+        });
+      }
     }
 
     /* 1. A confirmed job with everything filled in — you are on it,
@@ -146,15 +192,25 @@ export async function POST() {
       createdAt: T,
     });
 
-    const n = (await invoiceCount()) + 41;
     await saveInvoice({
       id: "inv-" + uid(),
       jobId: wrapped.id,
-      number: `CR-${T.slice(0, 4)}-0${n}`,
+      number: await nextInvoiceNumber(T.slice(0, 4)),
       issuedOn: T,
       dueOn: addDays(T, 30),
       status: "draft",
-      taxRate: 0.13,
+      taxRate: DEFAULT_TAX_RATE,
+      lines: defaultInvoiceLines(wrapped, settings),
+      notes: "Sample invoice — open it from Finances to add a kit, then mark it sent to archive the PDF.",
+      sentAt: null,
+      paidAt: null,
+      billTo: {
+        name: company.name,
+        address: company.billingAddress,
+        email: company.email,
+        attn: "Petra Solberg (PM) · Malik Okonjo",
+      },
+      hasDocument: false,
     });
     await setJobStatus(wrapped.id, "invoiced");
 
@@ -173,7 +229,7 @@ export async function POST() {
 
     await notify(
       "all",
-      "Sample data loaded — three jobs, a company, and an invoice to explore.",
+      "Sample data loaded — three jobs, a company, a kit, and an invoice to explore.",
       "check",
     );
 
