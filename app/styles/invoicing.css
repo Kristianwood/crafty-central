@@ -1,0 +1,376 @@
+/* ============================================================
+   Crafty Central — finances tabs, invoice tracking, the invoice
+   builder, and the kits & catalogue.
+   Same tokens as app.css (see the :root block there), same
+   Organic language: rounded cards on --card, pill controls,
+   Caprasimo for the numbers that matter.
+   ============================================================ */
+
+/* ============ Tabs ============ */
+
+.fin-tabs { margin-bottom: 22px; }
+.fin-tabs .seg { padding: 8px 18px; }
+
+/* ============ Tables: shared extras ============ */
+
+/* Wide tables scroll inside themselves on a phone rather than
+   pushing the page sideways. */
+.fin-scroll { overflow-x: auto; }
+.fin-scroll > .fin-table { min-width: 560px; }
+
+.fin-sub { display: block; font-size: 12px; color: var(--ink-3); margin-top: 2px; font-weight: 400; }
+.fin-mono { font-size: 12.5px; white-space: nowrap; }
+.fin-overdue { color: var(--red-ink); font-weight: 700; white-space: nowrap; }
+.fin-due-in { color: var(--ink-3); white-space: nowrap; }
+.fin-pills { display: inline-flex; gap: 5px; flex-wrap: wrap; }
+
+.fin-actions-cell { text-align: right; }
+.fin-actions { display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap; }
+.fin-actions .btn.sm { padding: 6px 12px; white-space: nowrap; }
+.fin-actions a.btn, .inv-foot a.btn { text-decoration: none; color: inherit; }
+.fin-table .icon-btn { margin-left: auto; }
+
+/* The expanded document sits on the page ground, not in a card row. */
+.fin-table tr.fin-doc-row td { background: transparent; padding: 0 0 6px; border-radius: 0; }
+.fin-table tr.fin-doc-row .doc { margin-top: 0; }
+
+/* ============ Filter chips ============ */
+
+.fin-filters { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+.fin-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 15px;
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--ink-2);
+  font-size: 12.5px;
+  font-weight: 700;
+  box-shadow: 0 1px 2px rgba(46,43,37,.08);
+  transition: background .15s var(--ease), color .15s var(--ease), transform .1s var(--ease);
+}
+.fin-filter:hover { background: var(--surface); }
+.fin-filter:active { transform: scale(.97); }
+.fin-filter.active { background: var(--accent); color: var(--cream); }
+.fin-filter .cnt {
+  font-size: 11px;
+  min-width: 20px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  text-align: center;
+  background: rgba(36,34,29,.08);
+}
+.fin-filter.active .cnt { background: rgba(245,239,226,.22); }
+
+/* ============ Catalogue table ============ */
+
+.fin-catalog tr.fin-group td {
+  background: transparent;
+  border-radius: 0;
+  padding: 10px 14px 0;
+  font-family: var(--display);
+  font-size: 17px;
+  color: var(--ink);
+}
+.fin-catalog .fin-group-count { font-family: var(--font); font-size: 12.5px; color: var(--ink-3); font-weight: 500; }
+.fin-catalog tr.fin-muted td { color: var(--ink-3); font-size: 12.5px; }
+.fin-catalog tr.inactive td { color: var(--ink-3); }
+.fin-catalog tr.inactive td strong { color: var(--ink-2); font-weight: 500; }
+.fin-catalog tr.inactive td.fin-total { color: var(--ink-3); font-weight: 500; }
+
+/* Active checkbox in the item form, styled like the "all days" pick */
+.cat-active {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 500 !important;
+  color: var(--ink-2);
+  min-height: 40px;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.cat-active input { width: 15px; height: 15px; accent-color: var(--accent); min-height: 0; flex: none; }
+
+/* ============ Kit cards ============ */
+
+.kit-card.static { cursor: default; }
+.kit-card.static:hover { transform: none; }
+.kit-desc { font-size: 12.5px; color: var(--ink-2); line-height: 1.5; margin: -2px 0 10px; }
+.kit-lines { list-style: none; display: flex; flex-direction: column; }
+.kit-lines li {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--ink-2);
+  padding: 5px 0;
+  border-bottom: 1px solid var(--line-soft);
+}
+.kit-lines li:last-child { border-bottom: none; }
+.kit-lines .kl-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.kit-lines .kl-qty { color: var(--ink-3); font-size: 12px; }
+.kit-lines .kl-amt { flex: none; font-weight: 600; color: var(--ink); }
+.kit-lines li.gone { color: var(--ink-3); font-style: italic; }
+.kit-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+  font-size: 12.5px;
+  color: var(--ink-2);
+}
+.kit-total b { font-family: var(--display); font-weight: 400; font-size: 20px; color: var(--ink); }
+
+/* Kit form rows */
+.kit-rows { display: flex; flex-direction: column; gap: 8px; }
+.kit-row { display: grid; grid-template-columns: 1fr 88px auto; gap: 8px; align-items: center; }
+.kit-row select, .kit-row input { min-height: 38px; padding: 7px 14px; font-size: 13.5px; }
+.kit-row .crew-remove { margin-left: 0; }
+.kit-form-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+  margin: 4px 0 14px;
+  padding: 10px 18px;
+  background: var(--bg);
+  border-radius: 999px;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+.kit-form-total b { font-family: var(--display); font-weight: 400; font-size: 18px; color: var(--ink); }
+
+/* ============ The invoice builder ============ */
+
+/* The editor needs room for a lines table; the modal grows for it
+   and only for it. */
+.modal:has(.inv-editor) { max-width: 880px; }
+
+.inv-editor { display: flex; flex-direction: column; gap: 16px; }
+.inv-head { margin-bottom: 0; }
+.inv-head-side { display: flex; align-items: center; gap: 10px; flex: none; }
+
+.inv-block-label {
+  font-size: 10.5px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.inv-meta { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0 12px; }
+.inv-meta .field { margin-bottom: 0; }
+
+.inv-billto {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 12px;
+  background: var(--card);
+  border-radius: 20px;
+  padding: 16px 18px 18px;
+}
+.inv-billto .inv-block-label { margin-bottom: 0; }
+.inv-billto .field { margin-bottom: 0; }
+.inv-billto textarea { min-height: 64px; background: var(--bg); }
+.inv-billto input { background: var(--bg); }
+
+/* Lines: a real table on desktop, narrow numeric columns so the
+   description gets the room. */
+.inv-lines { width: 100%; border-collapse: collapse; }
+.inv-lines th {
+  text-align: left;
+  font-size: 10.5px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  font-weight: 600;
+  padding: 0 10px 8px;
+}
+.inv-lines th.num { text-align: right; }
+.inv-lines th.col-qty { width: 92px; }
+.inv-lines th.col-unit { width: 104px; }
+.inv-lines th.col-rate { width: 124px; }
+.inv-lines th.col-amt { width: 112px; }
+.inv-lines th.col-x { width: 34px; }
+.inv-lines td { padding: 3px 3px; vertical-align: middle; }
+.inv-lines td.num { text-align: right; }
+.inv-lines input { min-height: 36px; padding: 7px 12px; font-size: 13.5px; border-radius: 12px; }
+.inv-lines td.num input { text-align: right; }
+.inv-lines input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
+.inv-lines input[type="number"]::-webkit-outer-spin-button,
+.inv-lines input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.inv-amount { font-weight: 600; white-space: nowrap; padding-right: 10px !important; }
+.inv-remove { text-align: center; }
+.inv-remove .crew-remove { margin: 0 auto; }
+.inv-lines-empty {
+  padding: 18px;
+  text-align: center;
+  color: var(--ink-3);
+  font-size: 13px;
+  border: 1.5px dashed var(--line);
+  border-radius: 18px;
+}
+
+/* Add-a-line controls */
+.inv-add-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 12px 16px;
+  align-items: start;
+  background: var(--card);
+  border-radius: 20px;
+  padding: 14px 18px 16px;
+}
+.inv-add label { display: block; font-size: 12px; font-weight: 600; color: var(--ink-2); margin-bottom: 6px; }
+.inv-add-ctl { display: flex; gap: 6px; align-items: center; }
+.inv-add-ctl select { min-height: 36px; padding: 6px 32px 6px 14px; font-size: 13px; background-color: var(--bg); }
+.inv-add-ctl input[type="number"] { width: 72px; min-height: 36px; padding: 6px 10px; font-size: 13px; background: var(--bg); flex: none; }
+.inv-add-ctl .btn.sm { flex: none; }
+.inv-add .hint { font-size: 11.5px; color: var(--ink-3); margin-top: 6px; }
+.inv-add .hint a { color: var(--accent-ink); font-weight: 600; }
+.inv-add .btn.sm { min-height: 36px; }
+
+/* Notes beside the totals */
+.inv-bottom { display: grid; grid-template-columns: 1fr 260px; gap: 16px; align-items: start; }
+.inv-totals {
+  background: var(--card);
+  border-radius: 20px;
+  padding: 14px 18px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.inv-totals > div { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; font-size: 13.5px; color: var(--ink-2); }
+.inv-totals > div b { color: var(--ink); font-weight: 600; }
+.inv-totals .grand { margin-top: 6px; padding-top: 10px; border-top: 1px solid var(--line); color: var(--ink); font-weight: 700; }
+.inv-totals .grand b { font-family: var(--display); font-weight: 400; font-size: 22px; }
+
+.inv-foot { flex-wrap: wrap; align-items: center; }
+.inv-hint { font-size: 12px; color: var(--ink-3); }
+
+/* Timeline strip on a sent / paid invoice */
+.inv-timeline { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.inv-step {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 14px 9px 9px;
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--ink-3);
+  font-size: 12.5px;
+}
+.inv-step .st-dot {
+  width: 24px; height: 24px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--surface);
+  flex: none;
+}
+.inv-step .st-dot svg { width: 12px; height: 12px; }
+.inv-step .st-label { font-weight: 700; }
+.inv-step .st-when { margin-left: auto; white-space: nowrap; }
+.inv-step.done { background: var(--green-soft); color: var(--green-ink); }
+.inv-step.done .st-dot { background: var(--green); color: var(--cream); }
+
+/* ============ Document preview extras ============ */
+
+.doc .dh-tag { font-size: 11.5px; color: var(--ink-3); }
+.doc .dh-kind { font-weight: 700; letter-spacing: .1em; color: var(--ink-3); }
+.doc .dh-kind.live { color: var(--accent-ink); }
+.doc-stamp {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  border: 1.5px solid currentColor;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: .1em;
+  line-height: 1.5;
+}
+.doc-stamp.paid { color: var(--green-ink); }
+.doc-stamp.overdue { color: var(--red-ink); }
+.doc-parties { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.doc-parties .doc-billto { margin-bottom: 16px; }
+.doc-email { font-size: 12px; color: var(--ink-2); }
+.doc-facts { color: var(--ink-2); }
+.doc-facts span { color: var(--ink-3); }
+.doc-pay { font-size: 12.5px; color: var(--ink-2); margin-top: 12px; }
+.doc-notes {
+  margin-top: 14px;
+  padding: 12px 14px;
+  background: var(--bg);
+  border-radius: 16px;
+  font-size: 13px;
+  color: var(--ink-2);
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+.doc-notes .db-label {
+  font-size: 10.5px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+/* ============ Mobile ============ */
+
+@media (max-width: 900px) {
+  .fin-tabs { display: flex; width: 100%; }
+  .fin-tabs .seg { flex: 1; justify-content: center; padding: 8px 8px; font-size: 12px; }
+  .fin-tabs .seg svg { display: none; }
+
+  .fin-actions { justify-content: flex-start; }
+
+  .inv-meta, .inv-billto, .inv-add-row, .inv-bottom, .inv-timeline, .doc-parties { grid-template-columns: 1fr; }
+  .inv-billto .field { grid-column: auto; }
+
+  /* Lines become stacked cards, each cell labelled from data-label. */
+  .inv-lines thead { display: none; }
+  .inv-lines, .inv-lines tbody, .inv-lines tr, .inv-lines td { display: block; width: 100%; }
+  .inv-lines tr {
+    background: var(--card);
+    border-radius: 18px;
+    padding: 10px 12px 12px;
+    margin-bottom: 8px;
+    position: relative;
+  }
+  .inv-lines td { padding: 4px 0; }
+  .inv-lines td[data-label]::before {
+    content: attr(data-label);
+    display: block;
+    font-size: 10.5px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    font-weight: 600;
+    margin-bottom: 3px;
+  }
+  .inv-lines td.num, .inv-lines td.num input { text-align: left; }
+  .inv-lines td.inv-amount { padding-right: 0 !important; }
+  .inv-lines td.inv-remove { position: absolute; top: 8px; right: 8px; width: auto; padding: 0; }
+  .inv-lines input { background: var(--bg); }
+
+  .inv-add-ctl { flex-wrap: wrap; }
+  .inv-add-ctl select { flex: 1 1 100%; }
+  .inv-foot > .btn { flex: 1 1 auto; justify-content: center; }
+  .inv-foot .inv-hint { flex: 1 1 100%; margin-right: 0 !important; }
+
+  .kit-row { grid-template-columns: 1fr 72px auto; }
+}
+
+/* The moment between "draft created" and the snapshot that carries
+   it. Sized so the modal does not jump when the real thing lands. */
+.inv-waiting { min-height: 180px; display: grid; place-items: center; }

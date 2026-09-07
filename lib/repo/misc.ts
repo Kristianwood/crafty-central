@@ -1,25 +1,27 @@
 /* ============================================================
    Crafty Central — companies, menu templates, on-set crew,
-   inquiries, invoices, time off and settings.
+   inquiries, time off and settings.
 
    Small tables with no assembly to speak of, kept together
-   rather than spread across seven near-empty files.
+   rather than spread across seven near-empty files. Invoices
+   grew lines and documents in 1.2 and moved to ./invoices.ts;
+   the catalogue and kits live in ./catalog.ts.
    ============================================================ */
 
-import { execute, jsonArray, query, queryOne, transaction } from "../db";
-import { uid } from "../domain";
+import { execute, isoDateTime, jsonArray, mysqlDateTime, query, queryOne, transaction } from "../db";
+import { STALE_REQUEST_HOURS, parseDateTime, uid } from "../domain";
+import { fmtAgo } from "../format";
 import {
   DEFAULT_SETTINGS,
   type Company,
   type Inquiry,
-  type Invoice,
-  type InvoiceStatus,
   type MenuTemplate,
   type SetCrewMember,
   type Settings,
   type TimeOff,
   type TimeOffStatus,
 } from "../types";
+import { notify } from "./notifications";
 
 /* ---------- companies ---------- */
 
@@ -44,6 +46,17 @@ const toCompany = (r: CompanyRow): Company => ({
 export async function listCompanies(): Promise<Company[]> {
   const rows = await query<CompanyRow>("SELECT * FROM companies ORDER BY name");
   return rows.map(toCompany);
+}
+
+/** Jobs store the company as free text; match it the way the views do. */
+export async function findCompanyByName(name: string): Promise<Company | null> {
+  const n = (name || "").trim();
+  if (!n) return null;
+  const r = await queryOne<CompanyRow>(
+    "SELECT * FROM companies WHERE LOWER(TRIM(name)) = LOWER(?) LIMIT 1",
+    [n],
+  );
+  return r ? toCompany(r) : null;
 }
 
 export async function saveCompany(input: Partial<Company>): Promise<Company> {
@@ -153,7 +166,7 @@ export async function deleteSetCrew(id: string): Promise<void> {
   await execute("DELETE FROM set_crew WHERE id = ?", [id]);
 }
 
-/* ---------- outreach inquiries ---------- */
+/* ---------- outreach inquiries (job requests) ---------- */
 
 interface InquiryRow {
   id: string;
@@ -191,7 +204,9 @@ export async function listInquiries(): Promise<Inquiry[]> {
         shootDays: [] as string[],
         notes: r.notes,
         status: r.status,
-        createdAt: r.created_at,
+        /* ISO, so the browser reads an instant rather than a
+           wall-clock string it would have to assume was its own. */
+        createdAt: isoDateTime(r.created_at) ?? r.created_at,
       } satisfies Inquiry,
     ]),
   );
@@ -212,7 +227,7 @@ export async function saveInquiry(input: Partial<Inquiry>): Promise<Inquiry> {
     shootDays: (input.shootDays || []).slice().sort(),
     notes: input.notes || "",
     status: input.status || "new",
-    createdAt: input.createdAt || new Date().toISOString().slice(0, 19).replace("T", " "),
+    createdAt: input.createdAt || new Date().toISOString(),
   };
   await transaction(async (conn) => {
     await conn.execute(
@@ -234,7 +249,7 @@ export async function saveInquiry(input: Partial<Inquiry>): Promise<Inquiry> {
         q.headcount,
         q.notes,
         q.status,
-        q.createdAt,
+        mysqlDateTime(new Date(q.createdAt)),
       ],
     );
     await conn.execute("DELETE FROM inquiry_days WHERE inquiry_id = ?", [q.id]);
@@ -252,51 +267,44 @@ export async function setInquiryStatus(id: string, status: Inquiry["status"]): P
   await execute("UPDATE inquiries SET status = ? WHERE id = ?", [status, id]);
 }
 
-/* ---------- invoices ---------- */
-
-interface InvoiceRow {
-  id: string;
-  job_id: string;
-  number: string;
-  issued_on: string;
-  due_on: string;
-  status: InvoiceStatus;
-  tax_rate: string;
-}
-
-const toInvoice = (r: InvoiceRow): Invoice => ({
-  id: r.id,
-  jobId: r.job_id,
-  number: r.number,
-  issuedOn: r.issued_on,
-  dueOn: r.due_on,
-  status: r.status,
-  taxRate: Number(r.tax_rate),
-});
-
-export async function listInvoices(): Promise<Invoice[]> {
-  const rows = await query<InvoiceRow>("SELECT * FROM invoices ORDER BY issued_on DESC");
-  return rows.map(toInvoice);
-}
-
-export async function saveInvoice(inv: Invoice): Promise<Invoice> {
-  await execute(
-    `INSERT INTO invoices (id, job_id, number, issued_on, due_on, status, tax_rate)
-     VALUES (?,?,?,?,?,?,?)
-     ON DUPLICATE KEY UPDATE number=VALUES(number), issued_on=VALUES(issued_on),
-       due_on=VALUES(due_on), status=VALUES(status), tax_rate=VALUES(tax_rate)`,
-    [inv.id, inv.jobId, inv.number, inv.issuedOn, inv.dueOn, inv.status, inv.taxRate],
+/**
+ * Nag the office about requests nobody has answered. Called from
+ * the workspace load rather than a timer — the same "nothing runs
+ * at 7am" rule as chat quiet hours. A request is reminded about
+ * once it has sat unanswered for STALE_REQUEST_HOURS, and again
+ * every STALE_REQUEST_HOURS after that until someone deals with it.
+ *
+ * The UPDATE is the lock: two people loading the dashboard at the
+ * same moment both see the row, but only the one whose UPDATE
+ * actually changes it sends the notification.
+ */
+export async function remindStaleRequests(): Promise<number> {
+  const rows = await query<{ id: string; company: string; headcount: number; created_at: string }>(
+    `SELECT id, company, headcount, created_at FROM inquiries
+      WHERE status = 'new'
+        AND created_at < NOW() - INTERVAL ? HOUR
+        AND (reminded_at IS NULL OR reminded_at < NOW() - INTERVAL ? HOUR)`,
+    [STALE_REQUEST_HOURS, STALE_REQUEST_HOURS],
   );
-  return inv;
-}
-
-export async function setInvoiceStatus(id: string, status: InvoiceStatus): Promise<void> {
-  await execute("UPDATE invoices SET status = ? WHERE id = ?", [status, id]);
-}
-
-export async function invoiceCount(): Promise<number> {
-  const rows = await query<{ n: number }>("SELECT COUNT(*) AS n FROM invoices");
-  return Number(rows[0]?.n ?? 0);
+  let sent = 0;
+  for (const r of rows) {
+    const res = await execute(
+      `UPDATE inquiries SET reminded_at = NOW()
+        WHERE id = ? AND status = 'new'
+          AND (reminded_at IS NULL OR reminded_at < NOW() - INTERVAL ? HOUR)`,
+      [r.id, STALE_REQUEST_HOURS],
+    );
+    if (!res.affectedRows) continue;
+    await notify(
+      "moderator",
+      `Still waiting: ${r.company}'s job request (${r.headcount} on set) came in ${fmtAgo(
+        parseDateTime(r.created_at),
+      )} and nobody has answered it yet.`,
+      "alert",
+    );
+    sent++;
+  }
+  return sent;
 }
 
 /* ---------- time off ---------- */

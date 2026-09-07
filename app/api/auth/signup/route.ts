@@ -1,4 +1,4 @@
-/* First sign-up claims the admin seat; after that, a new email
+/* First sign-up claims the owner seat; after that, a new email
    joins as crew. Someone an admin already added to the Directory
    keeps the role and position on file — signing up just attaches
    a password to the record that is already there. */
@@ -49,7 +49,7 @@ export async function POST(req: Request) {
     const person = await savePerson({
       id: newPersonId(),
       name: displayName,
-      role: first ? "admin" : "crew",
+      role: first ? "owner" : "crew",
       position,
       phone: "",
       email,

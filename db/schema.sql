@@ -16,16 +16,25 @@
 --     used to be per-device localStorage. With real accounts it
 --     is per-person, in the database.
 --
+-- Every statement here is CREATE TABLE IF NOT EXISTS, so this
+-- file describes a FRESH database. Columns added to an existing
+-- table after 1.0 are also listed in db/migrate.ts as patches,
+-- which is what brings an older database up to date.
+--
 -- Run with: npm run db:migrate
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS people (
   id            VARCHAR(40)  NOT NULL PRIMARY KEY,
   name          VARCHAR(160) NOT NULL,
-  role          ENUM('admin','moderator','crew') NOT NULL DEFAULT 'crew',
+  role          ENUM('owner','admin','moderator','crew') NOT NULL DEFAULT 'crew',
   position      VARCHAR(160) NOT NULL DEFAULT '',
   phone         VARCHAR(60)  NOT NULL DEFAULT '',
-  email         VARCHAR(190) NOT NULL DEFAULT '',
+  -- NULL, not '', for someone with no email: the unique index below
+  -- treats every NULL as distinct, so any number of people can be on
+  -- file without one. Two empty strings would collide, and the upsert
+  -- would resolve that collision by overwriting the first person.
+  email         VARCHAR(190) NULL DEFAULT NULL,
   tags          JSON         NOT NULL,
   dietary       JSON         NOT NULL,
   -- NULL until the person signs up; directory entries an admin
@@ -142,18 +151,22 @@ CREATE TABLE IF NOT EXISTS set_crew (
   notes    TEXT         NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- reminded_at: when the office was last nagged that this request
+-- is still unanswered. Set by the lazy sweep in the workspace load;
+-- nothing runs on a timer.
 CREATE TABLE IF NOT EXISTS inquiries (
-  id         VARCHAR(40)  NOT NULL PRIMARY KEY,
-  company    VARCHAR(190) NOT NULL,
-  pm         VARCHAR(160) NOT NULL DEFAULT '',
-  email      VARCHAR(190) NOT NULL DEFAULT '',
-  phone      VARCHAR(60)  NOT NULL DEFAULT '',
-  int_ext    VARCHAR(20)  NOT NULL DEFAULT '',
-  day_night  VARCHAR(20)  NOT NULL DEFAULT '',
-  headcount  INT          NOT NULL DEFAULT 0,
-  notes      TEXT         NOT NULL,
-  status     ENUM('new','converted','dismissed') NOT NULL DEFAULT 'new',
-  created_at DATETIME     NOT NULL,
+  id          VARCHAR(40)  NOT NULL PRIMARY KEY,
+  company     VARCHAR(190) NOT NULL,
+  pm          VARCHAR(160) NOT NULL DEFAULT '',
+  email       VARCHAR(190) NOT NULL DEFAULT '',
+  phone       VARCHAR(60)  NOT NULL DEFAULT '',
+  int_ext     VARCHAR(20)  NOT NULL DEFAULT '',
+  day_night   VARCHAR(20)  NOT NULL DEFAULT '',
+  headcount   INT          NOT NULL DEFAULT 0,
+  notes       TEXT         NOT NULL,
+  status      ENUM('new','converted','dismissed') NOT NULL DEFAULT 'new',
+  created_at  DATETIME     NOT NULL,
+  reminded_at DATETIME     NULL,
   KEY idx_inquiries_status (status, created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -164,16 +177,104 @@ CREATE TABLE IF NOT EXISTS inquiry_days (
   CONSTRAINT fk_inquiry_days FOREIGN KEY (inquiry_id) REFERENCES inquiries(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- The bill_to_* columns are a snapshot taken when the invoice is
+-- drafted, so a company's address changing later never rewrites
+-- an invoice that already went out.
 CREATE TABLE IF NOT EXISTS invoices (
-  id        VARCHAR(40) NOT NULL PRIMARY KEY,
-  job_id    VARCHAR(40) NOT NULL,
-  number    VARCHAR(40) NOT NULL,
-  issued_on DATE        NOT NULL,
-  due_on    DATE        NOT NULL,
-  status    ENUM('draft','sent','paid') NOT NULL DEFAULT 'draft',
-  tax_rate  DECIMAL(5,4) NOT NULL DEFAULT 0.1300,
+  id              VARCHAR(40) NOT NULL PRIMARY KEY,
+  job_id          VARCHAR(40) NOT NULL,
+  number          VARCHAR(40) NOT NULL,
+  issued_on       DATE        NOT NULL,
+  due_on          DATE        NOT NULL,
+  status          ENUM('draft','sent','paid') NOT NULL DEFAULT 'draft',
+  tax_rate        DECIMAL(5,4) NOT NULL DEFAULT 0.1300,
+  notes           VARCHAR(2000) NOT NULL DEFAULT '',
+  sent_at         DATETIME    NULL,
+  paid_at         DATETIME    NULL,
+  bill_to_name    VARCHAR(190) NOT NULL DEFAULT '',
+  bill_to_address VARCHAR(500) NOT NULL DEFAULT '',
+  bill_to_email   VARCHAR(190) NOT NULL DEFAULT '',
+  attn            VARCHAR(255) NOT NULL DEFAULT '',
   CONSTRAINT fk_invoices_job FOREIGN KEY (job_id) REFERENCES jobs(id) ON DELETE CASCADE,
-  KEY idx_invoices_job (job_id)
+  -- Two people drafting at the same moment read the same "next"
+  -- number; this is what stops them both keeping it.
+  UNIQUE KEY uq_invoices_number (number),
+  KEY idx_invoices_job (job_id),
+  KEY idx_invoices_status (status, due_on)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- What the invoice charges for. An invoice with no rows here was
+-- drafted before 1.2 and is priced from its job, as it always was.
+-- catalog_item_id / kit_id say where a line came from and are
+-- deliberately not foreign keys: deleting a kit must not touch an
+-- invoice that already used it.
+CREATE TABLE IF NOT EXISTS invoice_lines (
+  id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  invoice_id      VARCHAR(40)  NOT NULL,
+  position        INT          NOT NULL DEFAULT 0,
+  description     VARCHAR(255) NOT NULL,
+  qty             DECIMAL(10,2) NOT NULL DEFAULT 1,
+  unit            VARCHAR(40)  NOT NULL DEFAULT '',
+  unit_price      DECIMAL(10,2) NOT NULL DEFAULT 0,
+  catalog_item_id VARCHAR(40)  NULL,
+  kit_id          VARCHAR(40)  NULL,
+  CONSTRAINT fk_invoice_lines_invoice FOREIGN KEY (invoice_id) REFERENCES invoices(id) ON DELETE CASCADE,
+  KEY idx_invoice_lines_invoice (invoice_id, position)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- The PDF exactly as it went out, archived when the invoice is
+-- marked sent. Lives in the database rather than on disk because
+-- a deploy replaces the app directory wholesale.
+CREATE TABLE IF NOT EXISTS invoice_documents (
+  invoice_id VARCHAR(40)  NOT NULL PRIMARY KEY,
+  filename   VARCHAR(120) NOT NULL,
+  byte_size  INT          NOT NULL,
+  pdf        MEDIUMBLOB   NOT NULL,
+  created_at DATETIME     NOT NULL,
+  CONSTRAINT fk_invoice_documents_invoice FOREIGN KEY (invoice_id) REFERENCES invoices(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- The legend of products and services an invoice can be built from.
+CREATE TABLE IF NOT EXISTS catalog_items (
+  id          VARCHAR(40)  NOT NULL PRIMARY KEY,
+  name        VARCHAR(190) NOT NULL,
+  kind        ENUM('product','service') NOT NULL DEFAULT 'product',
+  unit        VARCHAR(40)  NOT NULL DEFAULT 'each',
+  unit_price  DECIMAL(10,2) NOT NULL DEFAULT 0,
+  description VARCHAR(500) NOT NULL DEFAULT '',
+  is_active   TINYINT(1)   NOT NULL DEFAULT 1,
+  position    INT          NOT NULL DEFAULT 0,
+  KEY idx_catalog_kind (kind, position)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- A kit is a named bundle of catalogue items with quantities.
+CREATE TABLE IF NOT EXISTS kits (
+  id          VARCHAR(40)  NOT NULL PRIMARY KEY,
+  name        VARCHAR(190) NOT NULL,
+  description VARCHAR(500) NOT NULL DEFAULT '',
+  position    INT          NOT NULL DEFAULT 0
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS kit_items (
+  id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  kit_id          VARCHAR(40)  NOT NULL,
+  catalog_item_id VARCHAR(40)  NOT NULL,
+  qty             DECIMAL(10,2) NOT NULL DEFAULT 1,
+  position        INT          NOT NULL DEFAULT 0,
+  CONSTRAINT fk_kit_items_kit FOREIGN KEY (kit_id) REFERENCES kits(id) ON DELETE CASCADE,
+  CONSTRAINT fk_kit_items_item FOREIGN KEY (catalog_item_id) REFERENCES catalog_items(id) ON DELETE CASCADE,
+  KEY idx_kit_items_kit (kit_id, position)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- One person's dashboard arrangement. See DashboardLayout in
+-- lib/types.ts; it is validated against the person's role every
+-- time it is read, so a stale or hand-edited layout cannot show a
+-- widget the role may not see.
+CREATE TABLE IF NOT EXISTS dashboard_layouts (
+  person_id  VARCHAR(40) NOT NULL PRIMARY KEY,
+  layout     JSON        NOT NULL,
+  updated_at TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT fk_dashboard_person FOREIGN KEY (person_id) REFERENCES people(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS time_off (

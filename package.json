@@ -1,6 +1,6 @@
 {
   "name": "crafty-central",
-  "version": "1.0.0",
+  "version": "1.2.0",
   "private": true,
   "description": "The all-in-one hub for Crafty — jobs, calendar, crew, chat, and invoicing.",
   "scripts": {
@@ -10,18 +10,21 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "db:migrate": "node --env-file-if-exists=.env --experimental-strip-types db/migrate.ts",
-    "db:seed": "node --env-file-if-exists=.env --experimental-strip-types db/seed.ts"
+    "db:seed": "node --env-file-if-exists=.env --experimental-strip-types db/seed.ts",
+    "db:owner": "node --env-file-if-exists=.env --experimental-strip-types db/make-owner.ts"
   },
   "dependencies": {
     "bcryptjs": "3.0.3",
     "mysql2": "3.24.3",
     "next": "16.3.3",
+    "pdfkit": "0.20.2",
     "react": "19.2.8",
     "react-dom": "19.2.8"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "4.3.3",
     "@types/node": "26.4.0",
+    "@types/pdfkit": "0.17.6",
     "@types/react": "19.2.18",
     "@types/react-dom": "19.2.5",
     "eslint": "^9.39.0",

@@ -1,0 +1,359 @@
+/* ============================================================
+   Crafty Central — dashboard widgets & customise mode
+   Same tokens as app.css (see the :root block there). The page is
+   a two-column grid of rounded cards; a "full" widget spans both
+   columns and everything collapses to one column under 900px, the
+   same breakpoint app.css uses for the rest of the app.
+   ============================================================ */
+
+/* ============ Page header ============ */
+
+.dash-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 22px;
+}
+.dash-greeting {
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: 30px;
+  letter-spacing: 0;
+  line-height: 1.1;
+}
+.dash-subline { font-size: 13.5px; color: var(--ink-2); margin-top: 5px; }
+.dash-head-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+.dash-edit-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--accent-ink);
+  background: var(--accent-soft);
+  border-radius: 999px;
+  padding: 8px 16px;
+  margin-bottom: 16px;
+  width: fit-content;
+  max-width: 100%;
+}
+.dash-edit-note svg { width: 14px; height: 14px; flex: none; }
+
+/* ============ The grid ============ */
+
+.dash-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+.dash-widget.full { grid-column: 1 / -1; }
+
+.dash-widget {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--card);
+  border-radius: 24px;
+  padding: 18px 20px 20px;
+  box-shadow: 0 1px 2px rgba(46, 43, 37, .09);
+  transition: transform .18s var(--ease), opacity .18s var(--ease), outline-color .18s var(--ease);
+}
+.dash-widget .dw-body { flex: 1; min-width: 0; }
+
+/* The stat row is the one widget whose tiles are the cards, so its
+   own frame stays out of the way until it is being arranged. */
+.dash-widget.stats { background: transparent; box-shadow: none; padding: 0; }
+.dash-widget.stats .dw-head { padding: 0 6px; }
+.dash-widget.stats.editing { background: var(--surface); padding: 14px 16px 16px; }
+.dash-widget.stats.editing .dw-head { padding: 0; }
+
+/* — card header — */
+.dw-head { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; min-height: 30px; }
+.dw-title { font-family: var(--display); font-weight: 400; font-size: 19px; letter-spacing: 0; line-height: 1.2; }
+.dw-badge {
+  min-width: 22px; height: 22px;
+  padding: 0 7px;
+  border-radius: 999px;
+  display: inline-grid;
+  place-items: center;
+  font-size: 11.5px;
+  font-weight: 700;
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+}
+.dw-badge.alert { background: var(--red); color: var(--cream); }
+.dw-grip { display: grid; color: var(--ink-3); cursor: grab; }
+.dw-grip svg { width: 16px; height: 16px; }
+
+/* A hint-plus-action line at the top of a body (upcoming, workload). */
+.dw-sub {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.dw-more {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--accent-ink);
+  text-decoration: none;
+}
+.dw-more:hover { text-decoration: underline; }
+.dash-muted { font-size: 13px; color: var(--ink-3); padding: 6px 2px; }
+
+/* Rows app.css paints on --card need a step down inside a card. */
+.dash-widget .job-row { background: var(--bg); box-shadow: none; }
+.dash-widget .job-row:hover { background: var(--surface); box-shadow: var(--shadow); }
+.dash-widget .workload-row { background: var(--bg); box-shadow: none; }
+.dash-widget .workload-row:hover { background: var(--surface); box-shadow: var(--shadow); }
+.dash-widget.half .workload-list { grid-template-columns: 1fr; }
+.dash-widget .empty { padding: 30px 16px; }
+.dash-widget .to-item:last-child { margin-bottom: 0; }
+.dash-widget .inq-row:last-child { margin-bottom: 0; }
+
+/* ============ Customise mode ============ */
+
+.dash-widget.editing {
+  outline: 1.5px dashed var(--line);
+  outline-offset: 4px;
+  cursor: grab;
+}
+.dash-widget.editing:active { cursor: grabbing; }
+.dash-widget.dragging { opacity: .45; }
+.dash-widget.drag-over {
+  outline: 2px dashed var(--accent);
+  outline-offset: 4px;
+  transform: scale(1.012);
+}
+
+/* Bodies keep rendering so the person can see what they are
+   arranging, but nothing in them should fire. The stat picker
+   opts back in with .dw-live. */
+.dash-widget.editing .dw-body { pointer-events: none; user-select: none; -webkit-user-select: none; }
+.dash-widget.editing .dw-body .dw-live { pointer-events: auto; user-select: auto; -webkit-user-select: auto; }
+
+.dw-tools { margin-left: auto; display: flex; align-items: center; gap: 4px; flex: none; }
+.dw-tool {
+  width: 30px; height: 30px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: var(--surface);
+  color: var(--ink-2);
+  transition: background .15s var(--ease), color .15s var(--ease), transform .1s var(--ease);
+}
+.dw-tool svg { width: 14px; height: 14px; }
+.dw-tool:hover { background: var(--line); color: var(--ink); }
+.dw-tool:active { transform: scale(.92); }
+.dw-tool:disabled { opacity: .35; cursor: default; }
+.dw-tool:disabled:hover { background: var(--surface); color: var(--ink-2); }
+.dw-tool.hide:hover { background: var(--red-soft); color: var(--red-ink); }
+.dash-widget.stats.editing .dw-tool { background: var(--card); }
+
+.dw-seg { margin: 0 2px; padding: 3px; }
+.dw-seg .seg { padding: 4px 11px; font-size: 11.5px; }
+.dash-widget.stats.editing .dw-seg { background: var(--card); }
+
+/* — add-a-widget tray — */
+.dash-tray {
+  margin-top: 18px;
+  border: 1.5px dashed var(--line);
+  border-radius: 24px;
+  padding: 16px 18px 18px;
+}
+.dash-tray-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+.dash-tray-title { font-family: var(--display); font-size: 17px; }
+.dash-tray-list { display: flex; flex-wrap: wrap; gap: 8px; }
+.tray-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--card);
+  border-radius: 999px;
+  padding: 8px 18px 8px 12px;
+  box-shadow: 0 1px 2px rgba(46, 43, 37, .1);
+  text-align: left;
+  max-width: 100%;
+  transition: background .15s var(--ease), transform .1s var(--ease);
+}
+.tray-pill:hover { background: var(--accent-soft); }
+.tray-pill:active { transform: scale(.98); }
+.tray-pill svg { width: 14px; height: 14px; color: var(--accent-ink); flex: none; }
+.tp-text { display: flex; flex-direction: column; line-height: 1.25; min-width: 0; }
+.tp-label { font-weight: 700; font-size: 13px; }
+.tp-hint { font-size: 11.5px; color: var(--ink-3); }
+.dash-tray-warn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--red-ink);
+}
+.dash-tray-warn svg { width: 14px; height: 14px; flex: none; }
+
+/* ============ Stats widget ============ */
+
+.dash-stat-row { grid-template-columns: repeat(var(--n, 4), minmax(0, 1fr)); }
+
+.stat-pick {
+  margin-top: 14px;
+  background: var(--card);
+  border-radius: 20px;
+  padding: 12px 14px 14px;
+}
+.stat-pick-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 9px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--ink-2);
+}
+.stat-pick .tag-check { background: var(--bg); }
+.stat-pick .tag-check.is-off { opacity: .45; cursor: not-allowed; }
+
+/* ============ Job requests ============ */
+
+.req-list { display: flex; flex-direction: column; }
+.req-row.stale { background: var(--red-soft); }
+.req-top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.req-age {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+.req-age svg { width: 11px; height: 11px; }
+.req-age.stale { background: var(--red); color: var(--cream); }
+.req-age.stale svg { animation: pulse-dot 2s var(--ease) infinite; }
+.req-row .to-actions { flex-wrap: wrap; justify-content: flex-end; }
+/* The Reply action is a mailto link wearing the button class. */
+.req-row .to-actions a.btn { text-decoration: none; color: inherit; }
+
+/* ============ On the truck today ============ */
+
+.today-next {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink-2);
+  margin-bottom: 12px;
+}
+.today-next svg { width: 14px; height: 14px; color: var(--ink-3); }
+.today-list { display: flex; flex-direction: column; gap: 10px; }
+.today-job { background: var(--bg); border-radius: 20px; padding: 14px 16px 14px; }
+.today-job.has-miss { background: var(--red-soft); }
+.tj-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.tj-name { font-family: var(--display); font-size: 17px; line-height: 1.2; }
+.tj-co { font-size: 12px; color: var(--ink-3); margin-top: 3px; font-weight: 500; }
+.tj-meta { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 10px; font-size: 12.5px; font-weight: 500; color: var(--ink-2); }
+.tj-meta span { display: inline-flex; align-items: center; gap: 6px; }
+.tj-meta svg { width: 13px; height: 13px; color: var(--ink-3); }
+.tj-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 12px; flex-wrap: wrap; }
+.tj-nocrew { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: var(--red-ink); }
+.tj-nocrew svg { width: 13px; height: 13px; }
+.tj-actions { display: flex; gap: 6px; }
+
+/* ============ Invoice tracking ============ */
+
+.inv-minis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-bottom: 12px; }
+.inv-mini { background: var(--bg); border-radius: 18px; padding: 12px 14px 13px; min-width: 0; }
+.inv-mini.clay { background: var(--red-soft); }
+.im-label { display: block; font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; font-weight: 600; color: var(--ink-3); }
+.inv-mini.clay .im-label { color: var(--red-ink); }
+.im-value { display: block; font-family: var(--display); font-size: 26px; line-height: 1.1; margin-top: 4px; }
+.inv-mini.clay .im-value { color: var(--red-ink); }
+.im-sub { display: block; font-size: 12px; color: var(--ink-2); margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.inv-list { display: flex; flex-direction: column; gap: 8px; }
+.inv-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto auto auto;
+  gap: 12px;
+  align-items: center;
+  background: var(--bg);
+  border-radius: 16px;
+  padding: 10px 12px 10px 16px;
+  font-size: 13px;
+}
+.ir-num { font-weight: 700; font-size: 12.5px; white-space: nowrap; }
+.ir-name { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--ink-2); }
+.ir-due { font-size: 12px; color: var(--ink-3); white-space: nowrap; }
+.ir-due.late { color: var(--red-ink); font-weight: 700; }
+.ir-total { font-weight: 700; white-space: nowrap; }
+.ir-pdf {
+  width: 28px; height: 28px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: var(--card);
+  color: var(--ink-2);
+  transition: background .15s var(--ease), color .15s var(--ease);
+}
+.ir-pdf:hover { background: var(--accent-soft); color: var(--accent-ink); }
+.ir-pdf svg { width: 14px; height: 14px; }
+
+/* ============ My notes ============ */
+
+.notes-area {
+  width: 100%;
+  min-height: 170px;
+  border: none;
+  border-radius: 20px;
+  background: var(--bg);
+  padding: 14px 16px;
+  font-size: 14px;
+  line-height: 1.55;
+  resize: vertical;
+  outline: none;
+  transition: box-shadow .15s var(--ease);
+}
+.notes-area:focus { box-shadow: 0 0 0 3px rgba(46, 107, 168, .16); }
+.notes-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 8px; font-size: 11.5px; color: var(--ink-3); }
+.notes-state { font-weight: 700; }
+.notes-state.saving { color: var(--amber); }
+.notes-state.saved { color: var(--green-ink); }
+
+/* ============ Mobile ============ */
+
+@media (max-width: 900px) {
+  .dash-head { align-items: flex-start; margin-bottom: 16px; }
+  .dash-greeting { font-size: 25px; }
+  .dash-grid { grid-template-columns: 1fr; gap: 12px; }
+  .dash-widget.full { grid-column: auto; }
+  .dash-widget { padding: 16px 16px 18px; border-radius: 20px; }
+  .dash-widget.stats { padding: 0; }
+  .dash-widget.stats.editing { padding: 12px 12px 14px; }
+  .dash-stat-row { grid-template-columns: 1fr 1fr; }
+  .dw-head { flex-wrap: wrap; }
+  .dw-tools { width: 100%; margin-left: 0; justify-content: flex-end; }
+  .inv-minis { gap: 6px; }
+  .inv-mini { padding: 10px 12px; }
+  .im-value { font-size: 22px; }
+  .inv-row { display: flex; flex-wrap: wrap; gap: 6px 10px; }
+  .ir-name { flex: 1 1 100%; white-space: normal; }
+  .tj-foot { align-items: flex-start; flex-direction: column; }
+  .req-row .to-actions { justify-content: flex-start; }
+}

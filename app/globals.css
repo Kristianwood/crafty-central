@@ -16,6 +16,8 @@
 
 @import "tailwindcss";
 @import "./app.css";
+@import "./styles/dashboard.css";
+@import "./styles/invoicing.css";
 
 @theme {
   --color-bg: #f5efe2;

@@ -2005,3 +2005,92 @@ textarea { border-radius: 20px; background: var(--card); }
 .dp-off { display: flex; align-items: center; gap: 10px; font-size: 13px; padding: 5px 0; }
 .dp-off b { font-weight: 700; }
 .dp-off span:last-child { color: var(--ink-3); font-size: 12px; }
+
+
+/* ════════════════════════════════════════════════════════════════
+   1.2 — owner role & request signal
+   The owner seat wears a star on its directory tag, and the topbar
+   carries a count of unanswered job requests wherever you are —
+   amber while they are fresh, clay-red once one has waited a day.
+   ════════════════════════════════════════════════════════════════ */
+
+.role-tag.owner {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--accent);
+}
+.role-tag.owner svg { width: 10px; height: 10px; fill: currentColor; stroke-width: 1.5; }
+
+/* The role shown but not offered: the employee form for someone who
+   may edit the record but not the seat. Sits where the select would. */
+.role-static {
+  display: flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 10px 16px;
+  border-radius: 999px;
+  background: var(--bg);
+  border: 1px solid var(--line-soft);
+}
+.field select:disabled { opacity: .6; cursor: not-allowed; }
+
+/* Same height as the icon buttons it sits beside. */
+.req-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 14px 0 12px;
+  border-radius: 999px;
+  background: var(--amber-soft);
+  color: var(--amber);
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: .01em;
+  white-space: nowrap;
+  text-decoration: none;
+  box-shadow: 0 1px 2px rgba(46,43,37,.12);
+  transition: transform .1s var(--ease), box-shadow .18s var(--ease), background .18s var(--ease);
+}
+.req-pill:hover { box-shadow: 0 3px 10px rgba(46,43,37,.16); }
+.req-pill:active { transform: scale(.96); }
+.req-pill .rp-dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; flex: none; }
+.req-pill .rp-count { font-family: var(--mono); }
+.req-pill.stale { background: var(--red); color: var(--cream); box-shadow: 0 3px 10px rgba(185,92,51,.35); }
+.req-pill.stale .rp-dot { animation: pulse-dot 2s var(--ease) infinite; }
+
+/* Narrow screens keep the dot and the count; the words go. */
+@media (max-width: 600px) {
+  .req-pill { gap: 5px; padding: 0 11px 0 10px; }
+  .req-pill .rp-text { display: none; }
+}
+
+/* ════════════════════════════════════════════════════════════════
+   1.2 — stat tiles that hold their row
+
+   Two things went wrong once the tiles started carrying money to the
+   cent. `repeat(4, 1fr)` lets a wide value push its column past its
+   share, because 1fr's minimum is the content: four figures at the
+   38px display size pushed the finances page sideways. And even
+   penned in, a long value overflowed its own tile.
+
+   So the columns are minmax(0, 1fr) — they keep to their share, full
+   stop — and the value is sized by both of the things that decide
+   whether it fits: how long the string is (statSizeClass() in
+   lib/format.ts hands the length over as a class) and how wide the
+   tile actually is (cqi, against the tile as a container). The px
+   value is the ceiling on a roomy screen; the cqi value takes over
+   when the row is tight. A short value still reads large.
+   ════════════════════════════════════════════════════════════════ */
+
+.stat-row { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.stat-cell { container-type: inline-size; }
+
+.stat-value { font-size: min(38px, 30cqi); }
+.stat-value.long { font-size: min(30px, 20cqi); }
+.stat-value.xlong { font-size: min(25px, 18cqi); letter-spacing: -.01em; }
+
+@media (max-width: 900px) {
+  .stat-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

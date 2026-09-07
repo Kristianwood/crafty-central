@@ -7,7 +7,15 @@
    reads the same as it always did.
    ============================================================ */
 
-export type Role = "admin" | "moderator" | "crew";
+/**
+ * Roles, highest first. "owner" is the business owner's seat: it
+ * holds every permission an admin has, plus the ones an admin must
+ * not (granting the owner seat itself). There is normally exactly
+ * one owner.
+ */
+export type Role = "owner" | "admin" | "moderator" | "crew";
+export const ROLES: readonly Role[] = ["owner", "admin", "moderator", "crew"] as const;
+
 export type JobStatus = "estimate" | "confirmed" | "wrapped" | "invoiced";
 export type TimeOffStatus = "pending" | "approved" | "denied";
 export type InvoiceStatus = "draft" | "sent" | "paid";
@@ -127,7 +135,33 @@ export interface Inquiry {
   shootDays: string[];
   notes: string;
   status: InquiryStatus;
+  /** 'yyyy-mm-dd hh:mm:ss', server local time. */
   createdAt: string;
+}
+
+/* ---------- invoicing ---------- */
+
+/**
+ * One line on an invoice. Amount is always qty × unitPrice — it is
+ * derived, never stored, so the lines and the total cannot disagree.
+ * catalogItemId / kitId record where a line came from; they are
+ * provenance only and survive the item or kit being deleted later.
+ */
+export interface InvoiceLine {
+  description: string;
+  qty: number;
+  unit: string;
+  unitPrice: number;
+  catalogItemId?: string | null;
+  kitId?: string | null;
+}
+
+/** The "Bill to" block, snapshotted onto the invoice when it is drafted. */
+export interface BillTo {
+  name: string;
+  address: string;
+  email: string;
+  attn: string;
 }
 
 export interface Invoice {
@@ -138,7 +172,88 @@ export interface Invoice {
   dueOn: string;
   status: InvoiceStatus;
   taxRate: number;
+  /**
+   * Empty on invoices drafted before lines existed; the domain then
+   * prices them from the job exactly as it always did.
+   */
+  lines: InvoiceLine[];
+  notes: string;
+  /** ISO datetimes, or null until that step happens. */
+  sentAt: string | null;
+  paidAt: string | null;
+  billTo: BillTo;
+  /** true when the PDF that went out has been archived. */
+  hasDocument: boolean;
 }
+
+/* ---------- kits & catalogue ---------- */
+
+export type CatalogKind = "product" | "service";
+
+/** One priced product or service in the catalogue. */
+export interface CatalogItem {
+  id: string;
+  name: string;
+  kind: CatalogKind;
+  unit: string;
+  unitPrice: number;
+  description: string;
+  active: boolean;
+}
+
+export interface KitItem {
+  catalogItemId: string;
+  qty: number;
+}
+
+/** A named bundle of catalogue items, dropped onto an invoice in one go. */
+export interface Kit {
+  id: string;
+  name: string;
+  description: string;
+  items: KitItem[];
+}
+
+/* ---------- dashboard ---------- */
+
+export type WidgetId =
+  | "stats"
+  | "requests"
+  | "today"
+  | "upcoming"
+  | "invoices"
+  | "timeoff"
+  | "workload"
+  | "notes";
+
+export type WidgetSize = "full" | "half";
+
+export interface DashboardWidget {
+  id: WidgetId;
+  size: WidgetSize;
+}
+
+export type StatId =
+  | "jobsWeek"
+  | "covers"
+  | "attention"
+  | "pipeline"
+  | "requests"
+  | "timeoff"
+  | "outstanding"
+  | "overdue";
+
+/**
+ * One person's dashboard. Widgets not listed are hidden; the stat
+ * row shows the tiles in `stats`; `notes` is their own scratchpad.
+ */
+export interface DashboardLayout {
+  widgets: DashboardWidget[];
+  stats: StatId[];
+  notes: string;
+}
+
+/* ---------- the rest ---------- */
 
 export interface TimeOff {
   id: string;
@@ -192,9 +307,15 @@ export interface Workspace {
   setCrew: SetCrewMember[];
   inquiries: Inquiry[];
   invoices: Invoice[];
+  catalog: CatalogItem[];
+  kits: Kit[];
   timeOff: TimeOff[];
   notifications: AppNotification[];
   /** Channels with something delivered since this person last looked. */
   unreadChannels: string[];
   settings: Settings;
+  /** This person's own dashboard arrangement. */
+  dashboard: DashboardLayout;
+  /** The server's clock at load, so age maths never reads the client's. */
+  now: number;
 }

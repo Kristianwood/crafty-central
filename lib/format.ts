@@ -39,6 +39,26 @@ export function fmtTime12(t: string | number | null | undefined): string {
   return `${((h + 11) % 12) + 1}:${String(m || 0).padStart(2, "0")} ${ap}`;
 }
 
+/**
+ * The local calendar date of an ISO timestamp, as the yyyy-mm-dd the
+ * date formatters take. Slicing the first ten characters of the ISO
+ * string looks equivalent and is not: that is the UTC date, so an
+ * invoice sent at nine on Monday evening in Toronto prints as Tuesday.
+ */
+export function localDate(isoTimestamp: string | null | undefined): string | null {
+  if (!isoTimestamp) return null;
+  const d = new Date(isoTimestamp);
+  if (Number.isNaN(d.getTime())) return null;
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+
+/** That date, already formatted — the common case at a call site. */
+export const fmtStamp = (isoTimestamp: string | null | undefined): string => {
+  const d = localDate(isoTimestamp);
+  return d ? fmtShort(d) : "—";
+};
+
 export const fmtClock = (ts: number) =>
   new Date(ts).toLocaleTimeString("en-CA", { hour: "numeric", minute: "2-digit" });
 
@@ -71,6 +91,20 @@ export function avatarColor(id: string): string {
   let h = 0;
   for (const c of id) h = (h * 31 + c.charCodeAt(0)) >>> 0;
   return AVATAR_COLORS[h % AVATAR_COLORS.length];
+}
+
+/**
+ * How wide a stat tile's value reads, as a class the stylesheet can
+ * act on. The display face is 38px, which a four-figure money value
+ * outgrows in a quarter-width tile on a laptop; CSS cannot size on
+ * content, so the length is measured here and the stylesheet steps
+ * the face down. A "2" still reads large.
+ */
+export function statSizeClass(value: string | number): string {
+  const n = String(value).length;
+  if (n > 9) return "xlong";
+  if (n > 6) return "long";
+  return "";
 }
 
 export const STATUS_LABELS: Record<string, string> = { estimate: "Hold" };

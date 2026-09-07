@@ -6,6 +6,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { unansweredRequests } from "@/lib/domain";
 import { navFor } from "@/lib/nav";
 import { Icon } from "./icons";
 import { useWorkspace } from "./workspace-provider";
@@ -15,9 +16,20 @@ export function Sidebar({ unreadChat }: { unreadChat: boolean }) {
   const pathname = usePathname();
   const { ws, can } = useWorkspace();
 
-  const pendingTimeOff =
-    (can("approveTimeOff") ? ws.timeOff.filter((t) => t.status === "pending").length : 0) +
-    (can("createJob") ? ws.inquiries.filter((i) => i.status === "new").length : 0);
+  /* One badge for everything the office owes an answer to: time off
+     waiting on approval plus job requests nobody has replied to. The
+     title spells the split out, since the number alone cannot. */
+  const timeOffPending = can("approveTimeOff")
+    ? ws.timeOff.filter((t) => t.status === "pending").length
+    : 0;
+  const requestsWaiting = can("createJob") ? unansweredRequests(ws.inquiries).length : 0;
+  const pending = timeOffPending + requestsWaiting;
+  const pendingTitle = [
+    requestsWaiting ? `${requestsWaiting} request${requestsWaiting === 1 ? "" : "s"}` : "",
+    timeOffPending ? `${timeOffPending} time-off` : "",
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
   const items = navFor(ws.me.role);
 
@@ -40,8 +52,10 @@ export function Sidebar({ unreadChat }: { unreadChat: boolean }) {
             <Link key={n.id} href={n.href} className={`nav-link ${active ? "active" : ""}`.trim()}>
               <Icon name={n.icon} />
               <span>{n.label}</span>
-              {n.id === "dashboard" && pendingTimeOff > 0 && (
-                <span className="nav-badge">{pendingTimeOff}</span>
+              {n.id === "dashboard" && pending > 0 && (
+                <span className="nav-badge" title={pendingTitle}>
+                  {pending}
+                </span>
               )}
               {n.id === "chat" && unreadChat && (
                 <span

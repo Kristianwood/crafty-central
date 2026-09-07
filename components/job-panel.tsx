@@ -36,7 +36,9 @@ import {
 import { fmtDays, fmtLong, fmtMoney, fmtShort, fmtTime12, firstName } from "@/lib/format";
 import { Avatar, AvatarStack } from "./avatar";
 import { Empty } from "./empty";
+import { newestFirst } from "./finances/invoice-pill";
 import { Icon } from "./icons";
+import { InvoiceEditor } from "./invoice-editor";
 import { JobForm } from "./job-form";
 import { StatusPill } from "./status-pill";
 import { useWorkspace } from "./workspace-provider";
@@ -231,6 +233,7 @@ function JobSheet({ job: j, dayIdx: rawDayIdx }: { job: Job; dayIdx: number }) {
 
   const canEdit = can("editJob");
   const canCrew = can("assignCrew");
+  const [drafting, setDrafting] = useState(false);
   const miss = useMemo(() => missing(j), [j]);
 
   const multiDay = j.shootDays.length > 1;
@@ -449,25 +452,62 @@ function JobSheet({ job: j, dayIdx: rawDayIdx }: { job: Job; dayIdx: number }) {
         {can("finances") && j.status !== "invoiced" && (
           <button
             className="btn"
+            /* Drafting is a POST that mints a number, so a second click
+               while the first is still in flight would mint a second
+               invoice for the same job. */
+            disabled={drafting}
             onClick={async () => {
-              const out = await mutate<{ invoice: { number: string } }>(
-                `/api/jobs/${j.id}/invoice`,
-              );
-              toast(`Invoice ${out.invoice.number} drafted`, "doc");
+              if (drafting) return;
+              setDrafting(true);
+              try {
+                const out = await mutate<{ invoice: { id: string; number: string } }>(
+                  `/api/jobs/${j.id}/invoice`,
+                );
+                toast(`Invoice ${out.invoice.number} drafted`, "doc");
+                openModal(<InvoiceEditor invoiceId={out.invoice.id} />);
+              } catch {
+                /* mutate has already toasted why. */
+              } finally {
+                setDrafting(false);
+              }
             }}
           >
-            <Icon name="doc" /> Create invoice
+            <Icon name="doc" /> {drafting ? "Drafting…" : "Create invoice"}
           </button>
         )}
+
+        {can("finances") &&
+          (() => {
+            /* The latest invoice on this job, if any — the builder
+               shows it whatever state it is in. */
+            const inv = newestFirst(ws.invoices.filter((i) => i.jobId === j.id))[0];
+            return inv ? (
+              <button className="btn" onClick={() => openModal(<InvoiceEditor invoiceId={inv.id} />)}>
+                <Icon name="receipt" /> View invoice {inv.number}
+              </button>
+            ) : null;
+          })()}
 
         {canEdit && (
           <button
             className="btn danger"
             onClick={async () => {
-              if (!confirm(`Delete "${j.productionName}"? This also removes its invoices.`)) return;
-              await mutate(`/api/jobs/${j.id}`, undefined, "DELETE");
-              closePanel();
-              toast("Job deleted", "x");
+              if (
+                !confirm(
+                  `Delete "${j.productionName}"? Any draft invoice on it goes too. ` +
+                    "A job whose invoice has already gone out cannot be deleted.",
+                )
+              ) {
+                return;
+              }
+              try {
+                await mutate(`/api/jobs/${j.id}`, undefined, "DELETE");
+                closePanel();
+                toast("Job deleted", "x");
+              } catch {
+                /* Refused — an invoice has already gone out on it. The
+                   reason is on screen; the panel stays open. */
+              }
             }}
           >
             <Icon name="x" /> Delete

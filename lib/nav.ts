@@ -17,14 +17,18 @@ export interface NavItem {
   roles: Role[];
 }
 
+const ADMIN_UP: Role[] = ["owner", "admin"];
+const MODERATOR_UP: Role[] = ["owner", "admin", "moderator"];
+const EVERYONE: Role[] = ["owner", "admin", "moderator", "crew"];
+
 export const NAV: NavItem[] = [
-  { id: "dashboard", label: "Dashboard", icon: "dashboard", href: "/dashboard", roles: ["admin", "moderator"] },
-  { id: "calendar", label: "Calendar", icon: "calendar", href: "/calendar", roles: ["admin", "moderator", "crew"] },
-  { id: "schedule", label: "My Schedule", icon: "schedule", href: "/schedule", roles: ["admin", "moderator", "crew"] },
-  { id: "menus", label: "Menus", icon: "menu", href: "/menus", roles: ["admin", "moderator"] },
-  { id: "chat", label: "Chat", icon: "chat", href: "/chat", roles: ["admin", "moderator", "crew"] },
-  { id: "directory", label: "Directory", icon: "directory", href: "/directory", roles: ["admin", "moderator", "crew"] },
-  { id: "finances", label: "Finances", icon: "finances", href: "/finances", roles: ["admin"] },
+  { id: "dashboard", label: "Dashboard", icon: "dashboard", href: "/dashboard", roles: MODERATOR_UP },
+  { id: "calendar", label: "Calendar", icon: "calendar", href: "/calendar", roles: EVERYONE },
+  { id: "schedule", label: "My Schedule", icon: "schedule", href: "/schedule", roles: EVERYONE },
+  { id: "menus", label: "Menus", icon: "menu", href: "/menus", roles: MODERATOR_UP },
+  { id: "chat", label: "Chat", icon: "chat", href: "/chat", roles: EVERYONE },
+  { id: "directory", label: "Directory", icon: "directory", href: "/directory", roles: EVERYONE },
+  { id: "finances", label: "Finances", icon: "finances", href: "/finances", roles: ADMIN_UP },
 ];
 
 export const navFor = (role: Role): NavItem[] => NAV.filter((n) => n.roles.includes(role));

@@ -4,7 +4,7 @@ import { bad, body, handle, int, str, strArray } from "@/lib/api";
 import { requirePermission } from "@/lib/auth";
 import { todayISO } from "@/lib/domain";
 import { fmtRange } from "@/lib/format";
-import { newJobId, saveJob } from "@/lib/repo/jobs";
+import { getJob, newJobId, saveJob } from "@/lib/repo/jobs";
 import { notify } from "@/lib/repo/notifications";
 import { getSettings } from "@/lib/repo/misc";
 import type { DayInfo, Job, JobStatus } from "@/lib/types";
@@ -24,14 +24,25 @@ export async function POST(req: Request) {
     const shootDays = strArray(b.shootDays).sort();
     if (!shootDays.length) bad("A job needs at least one shoot day.");
 
-    const status = STATUSES.includes(b.status as JobStatus)
+    const settings = await getSettings();
+    const id = str(b.id);
+    const isNew = !id;
+    const before = id ? await getJob(id) : null;
+
+    /* "Invoiced" is terminal, and the job form does not offer it — so
+       a save that came from that form carries whatever the form last
+       had, which used to knock an invoiced job back to a hold. Its
+       money would then be counted twice: once as an outstanding
+       invoice and again in the estimate pipeline, with "Create
+       invoice" armed to make a second one. An edit changes the job's
+       details, never the fact that it has been billed. */
+    let status = STATUSES.includes(b.status as JobStatus)
       ? (b.status as JobStatus)
       : "estimate";
-    const settings = await getSettings();
-    const isNew = !str(b.id);
+    if (before?.status === "invoiced") status = "invoiced";
 
     const job: Job = {
-      id: str(b.id) || newJobId(),
+      id: id || newJobId(),
       productionName: name,
       productionCompany: str(b.productionCompany),
       agency: str(b.agency),

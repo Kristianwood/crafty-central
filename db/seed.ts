@@ -27,13 +27,23 @@ const addDays = (isoStr: string, n: number) => {
 };
 const now = Date.now();
 const hrs = (n: number) => now - n * 3600 * 1000;
-const dt = (ms: number) => new Date(ms).toISOString().slice(0, 19).replace("T", " ");
+/* MySQL DATETIME is server-local, so these are written the same way
+   lib/db.ts writes them — not toISOString(), which is UTC and would
+   make every seeded timestamp wrong by the machine's offset. */
+const dt = (ms: number) => {
+  const d = new Date(ms);
+  const p = (n: number) => String(n).padStart(2, "0");
+  return (
+    `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ` +
+    `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`
+  );
+};
 
 /* ---------- the crew ---------- */
 
 const people = [
-  ["p-mar", "Marisol Quintero", "admin", "Owner / Operator", ["Key"], "+1 (416) 508-2247", "marisol@craftyto.ca", []],
-  ["p-dar", "Dario Pellegrini", "moderator", "Operations Lead", ["Key", "Driver"], "+1 (647) 331-9084", "dario@craftyto.ca", ["Lactose intolerant"]],
+  ["p-mar", "Marisol Quintero", "owner", "Owner / Operator", ["Key"], "+1 (416) 508-2247", "marisol@craftyto.ca", []],
+  ["p-dar", "Dario Pellegrini", "admin", "Operations Lead", ["Key", "Driver"], "+1 (647) 331-9084", "dario@craftyto.ca", ["Lactose intolerant"]],
   ["p-kei", "Keisha Alleyne", "moderator", "Truck Captain", ["Key", "Chef"], "+1 (416) 772-4415", "keisha@craftyto.ca", []],
   ["p-tam", "Tam Nguyen-Brooks", "crew", "Craft Service", ["Assist"], "+1 (647) 906-1152", "tam@craftyto.ca", ["Vegetarian"]],
   ["p-roc", "Rocco Fiorito", "crew", "Grill / Prep", ["Chef"], "+1 (416) 285-7730", "rocco@craftyto.ca", []],
@@ -175,7 +185,7 @@ const jobs: SeedJob[] = [
     location: "Revival 629, 629 Eastern Ave",
     callTime: "08:00",
     wrapTime: "17:30",
-    status: "wrapped",
+    status: "invoiced",
     crew: [
       { role: "Assist", personId: "p-tam" },
       { role: "Chef", personId: "p-jun" },
@@ -234,6 +244,26 @@ const setCrew = [
   ["sc-3", "Camille Iwu", "Director", ["Gluten-free", "Dairy-free"], ""],
 ] as const;
 
+/* ---------- catalogue & kits ----------
+   The legend of products and services an invoice is built from,
+   and one kit that bundles three of them. */
+
+const catalog = [
+  ["ci-espresso", "Espresso bar service", "service", "day", 275, "Barista, machine, milks and syrups for the day."],
+  ["ci-smoothie", "Smoothie run", "service", "run", 180, "Mid-afternoon fresh smoothies for the whole crew."],
+  ["ci-substantial", "Extra substantial", "product", "cover", 6.5, "One additional hot substantial per head."],
+  ["ci-dinner", "Late-wrap dinner", "product", "cover", 19, "Hot dinner service when wrap runs past 8 PM."],
+  ["ci-truck2", "Second truck", "service", "day", 650, "A second unit for company moves or split units."],
+  ["ci-water", "Bottled water case", "product", "case", 14, "24 × 500 ml, delivered chilled."],
+] as const;
+
+const kits = [
+  ["kit-golden", "Golden-hour add-on", "Espresso bar plus a smoothie run and an extra substantial for everyone.",
+    [["ci-espresso", 1], ["ci-smoothie", 1], ["ci-substantial", 30]]],
+  ["kit-latewrap", "Late-wrap package", "Dinner for the unit and a second truck for the move.",
+    [["ci-dinner", 40], ["ci-truck2", 1], ["ci-water", 4]]],
+] as const;
+
 const fmtShort = (isoStr: string) =>
   new Date(isoStr + "T00:00:00").toLocaleDateString("en-CA", { month: "short", day: "numeric" });
 const fmtRange = (a: string, b: string) =>
@@ -285,6 +315,12 @@ const TABLES = [
   "notifications",
   "messages",
   "time_off",
+  "dashboard_layouts",
+  "kit_items",
+  "kits",
+  "catalog_items",
+  "invoice_documents",
+  "invoice_lines",
   "invoices",
   "inquiry_days",
   "inquiries",
@@ -355,6 +391,24 @@ async function main() {
     );
   }
 
+  for (const [id, name, kind, unit, price, description] of catalog) {
+    await conn.execute(
+      `INSERT INTO catalog_items (id, name, kind, unit, unit_price, description, is_active, position)
+       VALUES (?,?,?,?,?,?,1,0)`,
+      [id, name, kind, unit, price, description],
+    );
+  }
+
+  for (const [id, name, description, items] of kits) {
+    await conn.execute("INSERT INTO kits (id, name, description) VALUES (?,?,?)", [id, name, description]);
+    for (const [i, [itemId, qty]] of items.entries()) {
+      await conn.execute(
+        "INSERT INTO kit_items (kit_id, catalog_item_id, qty, position) VALUES (?,?,?,?)",
+        [id, itemId, qty, i],
+      );
+    }
+  }
+
   for (const j of jobs) {
     await conn.execute(
       `INSERT INTO jobs (id, production_name, production_company, agency, pm, producers,
@@ -416,16 +470,52 @@ async function main() {
     await conn.execute("INSERT INTO inquiry_days (inquiry_id, shoot_date) VALUES (?,?)", ["inq-1", d]);
   }
 
-  await conn.execute(
-    `INSERT INTO invoices (id, job_id, number, issued_on, due_on, status, tax_rate)
-     VALUES (?,?,?,?,?,?,?)`,
-    ["inv-1", "j-5", "CR-2026-041", addDays(T, -12), addDays(T, 18), "sent", 0.13],
-  );
-  await conn.execute(
-    `INSERT INTO invoices (id, job_id, number, issued_on, due_on, status, tax_rate)
-     VALUES (?,?,?,?,?,?,?)`,
-    ["inv-2", "j-4", "CR-2026-042", addDays(T, -4), addDays(T, 26), "paid", 0.13],
-  );
+  /* Invoices carry their own lines (the job's pricing at the time,
+     plus whatever kit went on) and a bill-to snapshot. inv-1 is out
+     and unpaid; inv-2 has been paid; inv-3 is a draft still being
+     built — three of the four tracking states. */
+  const covers = (j: SeedJob) => j.days.reduce((s, d) => s + (d.headcount ?? j.headcount), 0);
+  const jobLines = (j: SeedJob) => [
+    [`Full craft service — ${j.productionName}`, covers(j), "covers", j.perHead, null, null],
+    ["Truck & crew day rate", j.days.length, "days", j.truckDay, null, null],
+  ] as const;
+  const co = (id: string) => companies.find((c) => c[0] === id)!;
+
+  const invoices = [
+    {
+      id: "inv-1", job: jobs[4], number: "CR-2026-041", issued: addDays(T, -12), due: addDays(T, 18),
+      status: "sent", sentAt: dt(now - 12 * 86400_000), paidAt: null, company: co("co-cop"),
+      attn: "Dmitri Kovalenko (PM) · Fern Whitely",
+      notes: "Two-truck day with a company move at 13:00. Thanks for having us out on the bluffs.",
+      lines: [
+        ...jobLines(jobs[4]),
+        ["Second truck", 2, "day", 650, "ci-truck2", "kit-latewrap"],
+        ["Late-wrap dinner", 84, "cover", 19, "ci-dinner", "kit-latewrap"],
+      ],
+    },
+    {
+      id: "inv-2", job: jobs[3], number: "CR-2026-042", issued: addDays(T, -4), due: addDays(T, 26),
+      status: "paid", sentAt: dt(now - 4 * 86400_000), paidAt: dt(now - 1 * 86400_000), company: co("co-bel"),
+      attn: "", notes: "", lines: [...jobLines(jobs[3])],
+    },
+  ];
+
+  for (const inv of invoices) {
+    await conn.execute(
+      `INSERT INTO invoices (id, job_id, number, issued_on, due_on, status, tax_rate, notes,
+         sent_at, paid_at, bill_to_name, bill_to_address, bill_to_email, attn)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      [inv.id, inv.job.id, inv.number, inv.issued, inv.due, inv.status, 0.13, inv.notes,
+        inv.sentAt, inv.paidAt, inv.company[1], inv.company[2], inv.company[4], inv.attn],
+    );
+    for (const [i, [description, qty, unit, price, itemId, kitId]] of inv.lines.entries()) {
+      await conn.execute(
+        `INSERT INTO invoice_lines (invoice_id, position, description, qty, unit, unit_price,
+           catalog_item_id, kit_id) VALUES (?,?,?,?,?,?,?,?)`,
+        [inv.id, i, description, qty, unit, price, itemId, kitId],
+      );
+    }
+  }
 
   for (const [id, personId, start, end, reason, status, createdAt] of timeOff) {
     await conn.execute(
@@ -452,14 +542,17 @@ async function main() {
   await conn.query("INSERT IGNORE INTO settings (id) VALUES (1)");
   await conn.end();
 
-  console.log(`Seeded ${people.length} people, ${jobs.length} jobs, ${companies.length} companies.`);
+  console.log(
+    `Seeded ${people.length} people, ${jobs.length} jobs, ${companies.length} companies, ` +
+      `${catalog.length} catalogue items, ${kits.length} kits, ${invoices.length} invoices.`,
+  );
   if (devPassword) {
     console.log(`\nEvery seeded person can sign in with the password: ${devPassword}`);
-    console.log("Admin: marisol@craftyto.ca");
+    console.log("Owner: marisol@craftyto.ca · Admin: dario@craftyto.ca");
     console.log("Do not do this on anything reachable from the internet.");
   } else {
     console.log("\nNobody has a password yet — that is deliberate.");
-    console.log("Claim the admin account by signing up at /signup with marisol@craftyto.ca;");
+    console.log("Claim the owner account by signing up at /login with marisol@craftyto.ca;");
     console.log("the role and position already on file are kept.");
     console.log("For a throwaway dev database: npm run db:seed -- --force --password=letmein");
   }

@@ -39,6 +39,7 @@ export function JobForm({ job, presetDate }: Props) {
     producers: job?.producers ?? "",
     headcount: job?.headcount ? String(job.headcount) : "",
     status: job?.status && job.status !== "invoiced" ? job.status : "estimate",
+    /* Kept out of the select below: an invoiced job stays invoiced. */
     menuTpl: "",
     callTime: job?.callTime || "07:00",
     wrapTime: job?.wrapTime || "19:00",
@@ -188,11 +189,28 @@ export function JobForm({ job, presetDate }: Props) {
 
           <div className="field">
             <label>Status</label>
-            <select value={f.status} onChange={set("status")}>
-              <option value="estimate">Hold</option>
-              <option value="confirmed">Confirmed</option>
-              <option value="wrapped">Wrapped</option>
-            </select>
+            {job?.status === "invoiced" ? (
+              /* The select has no "invoiced" option and the server
+                 will not accept a downgrade, so say so rather than
+                 offering a choice that does nothing. */
+              <>
+                <div className="role-static">
+                  <span className="pill invoiced">
+                    <span className="pip" />
+                    Invoiced
+                  </span>
+                </div>
+                <span className="hint">
+                  This job has been invoiced. Reopen its invoice from Finances to change that.
+                </span>
+              </>
+            ) : (
+              <select value={f.status} onChange={set("status")}>
+                <option value="estimate">Hold</option>
+                <option value="confirmed">Confirmed</option>
+                <option value="wrapped">Wrapped</option>
+              </select>
+            )}
           </div>
 
           {ws.menus.length > 0 && (
