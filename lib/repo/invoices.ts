@@ -118,9 +118,16 @@ export async function invoicesForJob(jobId: string): Promise<Invoice[]> {
   return assemble(rows, lines);
 }
 
-/** MySQL's duplicate-key error, which here can only be the number. */
-const isDuplicateNumber = (err: unknown): boolean =>
-  !!err && typeof err === "object" && (err as { code?: string }).code === "ER_DUP_ENTRY";
+/** A duplicate on the number's unique key, and nothing else. */
+const isDuplicateNumber = (err: unknown): boolean => {
+  if (!err || typeof err !== "object") return false;
+  const e = err as { code?: string; sqlMessage?: string };
+  if (e.code !== "ER_DUP_ENTRY") return false;
+  /* The id is a fresh random string, so a primary-key clash is not a
+     thing that happens; check anyway rather than retry on the wrong
+     collision forever. */
+  return !e.sqlMessage || e.sqlMessage.includes("uq_invoices_number");
+};
 
 /**
  * Write the header and replace the lines, in one transaction.
@@ -146,34 +153,50 @@ export async function saveInvoice(inv: Invoice): Promise<Invoice> {
 
 async function writeInvoice(inv: Invoice): Promise<Invoice> {
   await transaction(async (conn) => {
-    await conn.execute(
-      `INSERT INTO invoices
-         (id, job_id, number, issued_on, due_on, status, tax_rate, notes, sent_at, paid_at,
-          bill_to_name, bill_to_address, bill_to_email, attn)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-       ON DUPLICATE KEY UPDATE
-         number=VALUES(number), issued_on=VALUES(issued_on), due_on=VALUES(due_on),
-         status=VALUES(status), tax_rate=VALUES(tax_rate), notes=VALUES(notes),
-         sent_at=VALUES(sent_at), paid_at=VALUES(paid_at),
-         bill_to_name=VALUES(bill_to_name), bill_to_address=VALUES(bill_to_address),
-         bill_to_email=VALUES(bill_to_email), attn=VALUES(attn)`,
-      [
-        inv.id,
-        inv.jobId,
-        inv.number,
-        inv.issuedOn,
-        inv.dueOn,
-        inv.status,
-        inv.taxRate,
-        inv.notes ?? "",
-        inv.sentAt ? mysqlDateTime(new Date(inv.sentAt)) : null,
-        inv.paidAt ? mysqlDateTime(new Date(inv.paidAt)) : null,
-        inv.billTo?.name ?? "",
-        inv.billTo?.address ?? "",
-        inv.billTo?.email ?? "",
-        inv.billTo?.attn ?? "",
-      ],
+    const values = [
+      inv.jobId,
+      inv.number,
+      inv.issuedOn,
+      inv.dueOn,
+      inv.status,
+      inv.taxRate,
+      inv.notes ?? "",
+      inv.sentAt ? mysqlDateTime(new Date(inv.sentAt)) : null,
+      inv.paidAt ? mysqlDateTime(new Date(inv.paidAt)) : null,
+      inv.billTo?.name ?? "",
+      inv.billTo?.address ?? "",
+      inv.billTo?.email ?? "",
+      inv.billTo?.attn ?? "",
+    ];
+
+    /* Insert and update are separate on purpose. An upsert here would
+       resolve a clash on the number's unique key by rewriting whoever
+       already holds that number — the new invoice would never exist
+       and someone else's would quietly change. A plain INSERT raises
+       the duplicate instead, which is what saveInvoice retries on. */
+    const [existing] = await conn.execute<import("mysql2").RowDataPacket[]>(
+      "SELECT id FROM invoices WHERE id = ? FOR UPDATE",
+      [inv.id],
     );
+
+    if (existing.length) {
+      await conn.execute(
+        `UPDATE invoices
+            SET job_id = ?, number = ?, issued_on = ?, due_on = ?, status = ?, tax_rate = ?,
+                notes = ?, sent_at = ?, paid_at = ?, bill_to_name = ?, bill_to_address = ?,
+                bill_to_email = ?, attn = ?
+          WHERE id = ?`,
+        [...values, inv.id],
+      );
+    } else {
+      await conn.execute(
+        `INSERT INTO invoices
+           (job_id, number, issued_on, due_on, status, tax_rate, notes, sent_at, paid_at,
+            bill_to_name, bill_to_address, bill_to_email, attn, id)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+        [...values, inv.id],
+      );
+    }
     await conn.execute("DELETE FROM invoice_lines WHERE invoice_id = ?", [inv.id]);
     for (const [i, l] of (inv.lines ?? []).entries()) {
       await conn.execute(

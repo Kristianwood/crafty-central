@@ -17,7 +17,8 @@ interface PersonRow {
   role: Role;
   position: string;
   phone: string;
-  email: string;
+  /** NULL when they have no email — see db/schema.sql. */
+  email: string | null;
   tags: unknown;
   dietary: unknown;
   password_hash: string | null;
@@ -29,7 +30,7 @@ const toPerson = (r: PersonRow): Person => ({
   role: r.role,
   position: r.position,
   phone: r.phone,
-  email: r.email,
+  email: r.email ?? "",
   tags: jsonArray(r.tags),
   dietary: jsonArray(r.dietary),
   hasAccount: !!r.password_hash,
@@ -45,9 +46,12 @@ export async function getPerson(id: string): Promise<Person | null> {
   return r ? toPerson(r) : null;
 }
 
+/** Nobody is found by a blank address — that is not an identity. */
 export async function getPersonByEmail(email: string): Promise<Person | null> {
+  const wanted = (email || "").trim();
+  if (!wanted) return null;
   const r = await queryOne<PersonRow>("SELECT * FROM people WHERE LOWER(email) = LOWER(?)", [
-    email,
+    wanted,
   ]);
   return r ? toPerson(r) : null;
 }
@@ -95,7 +99,8 @@ export async function savePerson(input: Partial<Person> & { id?: string }): Prom
       person.role,
       person.position,
       person.phone,
-      person.email,
+      // '' would collide with every other blank one under the unique key.
+      person.email || null,
       JSON.stringify(person.tags),
       JSON.stringify(person.dietary),
     ],

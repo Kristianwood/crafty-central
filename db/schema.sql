@@ -30,7 +30,11 @@ CREATE TABLE IF NOT EXISTS people (
   role          ENUM('owner','admin','moderator','crew') NOT NULL DEFAULT 'crew',
   position      VARCHAR(160) NOT NULL DEFAULT '',
   phone         VARCHAR(60)  NOT NULL DEFAULT '',
-  email         VARCHAR(190) NOT NULL DEFAULT '',
+  -- NULL, not '', for someone with no email: the unique index below
+  -- treats every NULL as distinct, so any number of people can be on
+  -- file without one. Two empty strings would collide, and the upsert
+  -- would resolve that collision by overwriting the first person.
+  email         VARCHAR(190) NULL DEFAULT NULL,
   tags          JSON         NOT NULL,
   dietary       JSON         NOT NULL,
   -- NULL until the person signs up; directory entries an admin

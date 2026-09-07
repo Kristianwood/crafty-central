@@ -16,7 +16,7 @@
 
 import { bad, body, handle, str } from "@/lib/api";
 import { requirePermission } from "@/lib/auth";
-import { invoiceTotal } from "@/lib/domain";
+import { invoiceTotal, todayISO } from "@/lib/domain";
 import { fmtMoney } from "@/lib/format";
 import { invoiceFilename, renderInvoicePdf } from "@/lib/pdf/invoice-pdf";
 import { getJob, setJobStatus } from "@/lib/repo/jobs";
@@ -107,9 +107,15 @@ export async function DELETE(_req: Request, { params }: Params) {
 
     await deleteInvoice(id);
 
+    /* With its last invoice gone the job is no longer invoiced, and
+       the status it had before is not recorded anywhere — so it is
+       read off the calendar rather than assumed. A job that has
+       already shot is wrapped; one still to come is confirmed, which
+       is what it must have been to be billed in the first place. */
     const job = await getJob(inv.jobId);
     if (job?.status === "invoiced" && !(await invoicesForJob(inv.jobId)).length) {
-      await setJobStatus(inv.jobId, "wrapped");
+      const lastDay = job.shootDays[job.shootDays.length - 1];
+      await setJobStatus(inv.jobId, !lastDay || lastDay < todayISO() ? "wrapped" : "confirmed");
     }
     return { ok: true };
   });

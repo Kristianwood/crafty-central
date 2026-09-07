@@ -104,6 +104,33 @@ const PATCHES: Patch[] = [
     applied: (db, s) => columnTypeIncludes(db, s, "people", "role", "'owner'"),
     apply: `ALTER TABLE people MODIFY role ENUM('owner','admin','moderator','crew') NOT NULL DEFAULT 'crew'`,
   },
+  {
+    /* An email is NULL when there isn't one, never ''. The column is
+       unique, and MySQL counts every NULL as distinct — but two empty
+       strings are a collision, which savePerson's upsert would settle
+       by overwriting whoever got there first. Adding a second crew
+       member with no email address used to erase the first. */
+    name: "people.email nullable for the unnamed",
+    applied: async (db, schema) => {
+      const [rows] = await db.query<mysql.RowDataPacket[]>(
+        `SELECT IS_NULLABLE FROM information_schema.COLUMNS
+          WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'people' AND COLUMN_NAME = 'email'`,
+        [schema],
+      );
+      return rows.length > 0 && rows[0].IS_NULLABLE === "YES";
+    },
+    apply: "ALTER TABLE people MODIFY email VARCHAR(190) NULL DEFAULT NULL",
+  },
+  {
+    name: "people.email '' becomes NULL",
+    applied: async (db) => {
+      const [rows] = await db.query<mysql.RowDataPacket[]>(
+        "SELECT 1 FROM people WHERE email = '' LIMIT 1",
+      );
+      return rows.length === 0;
+    },
+    apply: "UPDATE people SET email = NULL WHERE email = ''",
+  },
   addColumn("inquiries", "reminded_at", "DATETIME NULL"),
   addColumn("invoices", "notes", "VARCHAR(2000) NOT NULL DEFAULT ''"),
   addColumn("invoices", "sent_at", "DATETIME NULL"),
