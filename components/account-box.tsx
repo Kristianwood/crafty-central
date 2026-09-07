@@ -6,6 +6,7 @@
    who you are. */
 
 import { api } from "@/lib/client";
+import { ROLE_LABELS } from "@/lib/domain";
 import { Avatar } from "./avatar";
 import { Icon } from "./icons";
 import { useWorkspace } from "./workspace-provider";
@@ -28,7 +29,7 @@ export function AccountBox() {
       <Avatar person={ws.me} size="sm" />
       <div className="ab-meta">
         <span className="ab-name">{ws.me.name}</span>
-        <span className="ab-role">{ws.me.role}</span>
+        <span className="ab-role">{ROLE_LABELS[ws.me.role]}</span>
       </div>
       <button
         className="icon-btn"

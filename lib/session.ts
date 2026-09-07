@@ -9,7 +9,7 @@
 
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
-import { execute, queryOne } from "./db";
+import { execute, mysqlDateTime, queryOne } from "./db";
 
 export const SESSION_COOKIE = "crafty_session";
 const SESSION_DAYS = 30;
@@ -31,8 +31,6 @@ function secret(): string {
 const tokenHash = (token: string): string =>
   createHmac("sha256", secret()).update(token).digest("hex");
 
-const mysqlDate = (d: Date): string => d.toISOString().slice(0, 19).replace("T", " ");
-
 /** Mint a session, store its hash, and set the cookie. */
 export async function createSession(personId: string, userAgent = ""): Promise<void> {
   const token = randomBytes(32).toString("hex");
@@ -41,7 +39,8 @@ export async function createSession(personId: string, userAgent = ""): Promise<v
 
   await execute(
     "INSERT INTO sessions (id, person_id, created_at, expires_at, user_agent) VALUES (?,?,?,?,?)",
-    [tokenHash(token), personId, mysqlDate(now), mysqlDate(expires), userAgent.slice(0, 255)],
+    // Server-local, because the expiry is compared against NOW().
+    [tokenHash(token), personId, mysqlDateTime(now), mysqlDateTime(expires), userAgent.slice(0, 255)],
   );
 
   const jar = await cookies();

@@ -8,7 +8,7 @@
    the catalogue and kits live in ./catalog.ts.
    ============================================================ */
 
-import { execute, jsonArray, query, queryOne, transaction } from "../db";
+import { execute, jsonArray, mysqlDateTime, query, queryOne, transaction } from "../db";
 import { STALE_REQUEST_HOURS, parseDateTime, uid } from "../domain";
 import { fmtAgo } from "../format";
 import {
@@ -225,7 +225,7 @@ export async function saveInquiry(input: Partial<Inquiry>): Promise<Inquiry> {
     shootDays: (input.shootDays || []).slice().sort(),
     notes: input.notes || "",
     status: input.status || "new",
-    createdAt: input.createdAt || new Date().toISOString().slice(0, 19).replace("T", " "),
+    createdAt: input.createdAt || mysqlDateTime(),
   };
   await transaction(async (conn) => {
     await conn.execute(

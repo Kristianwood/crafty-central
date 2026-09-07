@@ -10,10 +10,12 @@
    ============================================================ */
 
 import { Fragment, useState } from "react";
+import { ROLE_LABELS, ROLE_RANK, mayAssignRole } from "@/lib/domain";
 import { avatarColor, initials } from "@/lib/format";
 import {
   CREW_ROLES,
   DIETARY,
+  ROLES,
   type Company,
   type Person,
   type Role,
@@ -24,7 +26,9 @@ import { Empty } from "@/components/empty";
 import { Icon } from "@/components/icons";
 import { useWorkspace } from "@/components/workspace-provider";
 
-const ROLE_ORDER: Record<Role, number> = { admin: 0, moderator: 1, crew: 2 };
+/* The list reads top-down by seniority — owner, admins, moderators,
+   crew — which is exactly the domain's rank, lowest number first. */
+const ROLE_ORDER: Record<Role, number> = ROLE_RANK;
 
 /** Checkbox rows are all-or-nothing toggles over a list of strings. */
 const toggle = (list: string[], v: string) =>
@@ -109,7 +113,10 @@ export default function DirectoryView() {
                   ))}
                 </div>
               </div>
-              <span className={`role-tag ${p.role}`}>{p.role}</span>
+              <span className={`role-tag ${p.role}`}>
+                {p.role === "owner" && <Icon name="star" />}
+                {ROLE_LABELS[p.role]}
+              </span>
               <div className="d-contact">
                 {p.phone}
                 <br />
@@ -246,7 +253,7 @@ export default function DirectoryView() {
 /* ============ Employee form (no dietary — that's for on-set crew) ============ */
 
 function PersonForm({ person }: { person?: Person }) {
-  const { mutate, toast, closeModal } = useWorkspace();
+  const { ws, can, mutate, toast, closeModal } = useWorkspace();
   const p = person;
   const [name, setName] = useState(p?.name ?? "");
   const [position, setPosition] = useState(p?.position ?? "");
@@ -255,6 +262,24 @@ function PersonForm({ person }: { person?: Person }) {
   const [email, setEmail] = useState(p?.email ?? "");
   const [tags, setTags] = useState<string[]>(p?.tags ?? []);
   const [busy, setBusy] = useState(false);
+
+  /* Which roles this actor may hand this person, by the same rule the
+     server applies (mayAssignRole). The current role is always offered
+     so the select never sits on a value missing from its own list. The
+     owner seat counts as vacant when the only owner is the person being
+     edited — that is how an admin can move it before anyone holds it. */
+  const isSelf = !!p && p.id === ws.me.id;
+  const current: Role | null = p?.role ?? null;
+  const ownerExists = ws.people.some((x) => x.role === "owner" && x.id !== p?.id);
+  const canManage = can("manageRoles");
+  const roleOptions = ROLES.filter(
+    (r) => r === (current ?? "crew") || mayAssignRole(ws.me.role, current, r, ownerExists),
+  );
+  const roleHint = isSelf
+    ? "Change your own role from another account."
+    : !ownerExists && !can("grantOwner")
+      ? "No owner yet — an admin can seat one person as owner."
+      : "The owner holds every permission. Only the owner can pass the seat on.";
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -275,7 +300,8 @@ function PersonForm({ person }: { person?: Person }) {
       closeModal();
       toast(p ? "Employee updated" : "Added to the team", "check");
     } catch {
-      /* Only an admin may set a role; mutate has already said so. */
+      /* A role this actor may not set, or the owner's record — the
+         server has already said which, through mutate's toast. */
       setBusy(false);
     }
   }
@@ -326,13 +352,34 @@ function PersonForm({ person }: { person?: Person }) {
           </div>
           <div className="field">
             <label>Role</label>
-            <select value={role} onChange={(e) => setRole(e.target.value as Role)}>
-              {(["crew", "moderator", "admin"] as const).map((r) => (
-                <option value={r} key={r}>
-                  {r[0].toUpperCase() + r.slice(1)}
-                </option>
-              ))}
-            </select>
+            {canManage ? (
+              <>
+                <select
+                  value={role}
+                  disabled={isSelf}
+                  onChange={(e) => setRole(e.target.value as Role)}
+                >
+                  {roleOptions.map((r) => (
+                    <option value={r} key={r}>
+                      {ROLE_LABELS[r]}
+                    </option>
+                  ))}
+                </select>
+                <span className="hint">{roleHint}</span>
+              </>
+            ) : (
+              <>
+                {/* A moderator may fix a phone number but not a seat,
+                    so the role is shown here rather than offered. */}
+                <div className="role-static">
+                  <span className={`role-tag ${role}`}>
+                    {role === "owner" && <Icon name="star" />}
+                    {ROLE_LABELS[role]}
+                  </span>
+                </div>
+                <span className="hint">Only an admin can change someone&apos;s role.</span>
+              </>
+            )}
           </div>
           <div className="field">
             <label>Phone</label>

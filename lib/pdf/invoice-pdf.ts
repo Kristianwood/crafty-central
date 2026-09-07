@@ -32,9 +32,11 @@ export interface InvoicePdfInput {
 
 /* Letter, 50pt margins → a 512pt-wide column. */
 const PAGE_W = 612;
+const PAGE_H = 792;
 const MARGIN = 50;
 const COL_W = PAGE_W - MARGIN * 2;
-const BOTTOM = 742;
+/* Where the body must stop: the footer sits below this. */
+const BOTTOM = PAGE_H - MARGIN - 26;
 
 const INK = "#24221d";
 const INK_2 = "#645c50";
@@ -53,6 +55,9 @@ export function renderInvoicePdf({ invoice: inv, job, settings }: InvoicePdfInpu
     const doc = new PDFDocument({
       size: "LETTER",
       margin: MARGIN,
+      // Pages are held open so the footer can be stamped onto every one
+      // of them at the end, once the page count is known.
+      bufferPages: true,
       info: {
         Title: `Invoice ${inv.number}`,
         Author: "Crafty",
@@ -255,22 +260,28 @@ function draw(doc: PDFKit.PDFDocument, inv: Invoice, job: Job | null, settings: 
     y = doc.y + 10;
   }
 
-  /* ---- footer on every page ---- */
+  /* ---- footer on every page ----
+     The footer sits in the bottom margin, which pdfkit would answer by
+     starting a fresh page. Dropping the bottom margin for the length of
+     the write is the documented way round that; it goes back straight
+     after, so nothing else is affected. */
   const range = doc.bufferedPageRange();
   for (let i = range.start; i < range.start + range.count; i++) {
     doc.switchToPage(i);
+    const keep = doc.page.margins.bottom;
+    doc.page.margins.bottom = 0;
     doc
       .font("Helvetica")
       .fontSize(8.5)
       .fillColor(INK_3)
       .text(
-        `Crafty · food truck & craft service for film · Toronto, ON        ${inv.number} · page ${
-          i - range.start + 1
-        } of ${range.count}`,
+        `Crafty · food truck & craft service for film · Toronto, ON` +
+          `        ${inv.number} · page ${i - range.start + 1} of ${range.count}`,
         MARGIN,
-        PAGE_W === 612 ? 760 : 760,
+        PAGE_H - MARGIN + 6,
         { width: COL_W, align: "center", lineBreak: false },
       );
+    doc.page.margins.bottom = keep;
   }
 }
 

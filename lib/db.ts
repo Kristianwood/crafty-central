@@ -98,6 +98,25 @@ export async function transaction<T>(
   }
 }
 
+/**
+ * A JS Date as MySQL's DATETIME sees it — server-local, to match
+ * NOW(). Deliberately not toISOString(): that is UTC, and a UTC
+ * string written into a DATETIME then compared against NOW() is
+ * wrong by the server's offset, which in Toronto is four or five
+ * hours. Every DATETIME this app writes goes through here.
+ */
+export function mysqlDateTime(d: Date = new Date()): string {
+  const p = (n: number) => String(n).padStart(2, "0");
+  return (
+    `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ` +
+    `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`
+  );
+}
+
+/** 'yyyy-mm-dd hh:mm:ss' back to ISO 8601, for the client. */
+export const isoDateTime = (s: string | null): string | null =>
+  s ? new Date(s.replace(" ", "T")).toISOString() : null;
+
 /** JSON columns come back parsed by mysql2, but be forgiving. */
 export function jsonArray(value: unknown): string[] {
   if (Array.isArray(value)) return value.map(String);

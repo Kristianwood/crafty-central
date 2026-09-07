@@ -73,6 +73,20 @@ export function avatarColor(id: string): string {
   return AVATAR_COLORS[h % AVATAR_COLORS.length];
 }
 
+/**
+ * How wide a stat tile's value reads, as a class the stylesheet can
+ * act on. The display face is 38px, which a four-figure money value
+ * outgrows in a quarter-width tile on a laptop; CSS cannot size on
+ * content, so the length is measured here and the stylesheet steps
+ * the face down. A "2" still reads large.
+ */
+export function statSizeClass(value: string | number): string {
+  const n = String(value).length;
+  if (n > 9) return "xlong";
+  if (n > 6) return "long";
+  return "";
+}
+
 export const STATUS_LABELS: Record<string, string> = { estimate: "Hold" };
 
 export const statusLabel = (s: string) =>

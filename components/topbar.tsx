@@ -1,7 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { usePathname } from "next/navigation";
+import {
+  ROLE_LABELS,
+  STALE_REQUEST_HOURS,
+  isStaleRequest,
+  unansweredRequests,
+} from "@/lib/domain";
 import { titleFor } from "@/lib/nav";
 import { fmtAgo } from "@/lib/format";
 import { Avatar } from "./avatar";
@@ -12,12 +19,18 @@ import { useWorkspace } from "./workspace-provider";
 
 export function Topbar() {
   const pathname = usePathname();
-  const { ws, mutate } = useWorkspace();
+  const { ws, can, mutate } = useWorkspace();
   const [open, setOpen] = useState(false);
   const drawerRef = useRef<HTMLElement | null>(null);
   const buttonRef = useRef<HTMLButtonElement | null>(null);
 
   const unread = ws.notifications.some((n) => !n.read);
+
+  /* Unanswered job requests follow you around the app, not just the
+     dashboard: a count beside the bell, turning red once one has sat
+     for a day. Age is measured against the server's clock. */
+  const waiting = can("createJob") ? unansweredRequests(ws.inquiries) : [];
+  const stale = waiting.some((q) => isStaleRequest(q, ws.now));
 
   /* Click anywhere else closes the drawer — same behaviour as before. */
   useEffect(() => {
@@ -41,6 +54,25 @@ export function Topbar() {
       <header className="topbar">
         <div className="topbar-title">{titleFor(pathname)}</div>
         <div className="topbar-actions">
+          {waiting.length > 0 && (
+            <Link
+              href="/dashboard"
+              className={`req-pill ${stale ? "stale" : ""}`.trim()}
+              aria-label={`${waiting.length} job request${waiting.length === 1 ? "" : "s"} waiting`}
+              title={
+                stale
+                  ? `A request has waited more than ${STALE_REQUEST_HOURS} hours — open the dashboard`
+                  : "Unanswered job requests — open the dashboard"
+              }
+            >
+              <span className="rp-dot" aria-hidden="true" />
+              <span className="rp-count">{waiting.length}</span>
+              <span className="rp-text">
+                {waiting.length === 1 ? "request" : "requests"} waiting
+              </span>
+            </Link>
+          )}
+
           <button
             ref={buttonRef}
             className="icon-btn"
@@ -63,7 +95,7 @@ export function Topbar() {
             <div className="u-meta">
               <span className="u-name">{ws.me.name}</span>
               <span className="u-role">
-                {ws.me.role} · {ws.me.position}
+                {ROLE_LABELS[ws.me.role]} · {ws.me.position}
               </span>
             </div>
             <Avatar person={ws.me} />

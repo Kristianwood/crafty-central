@@ -36,7 +36,9 @@ import {
 import { fmtDays, fmtLong, fmtMoney, fmtShort, fmtTime12, firstName } from "@/lib/format";
 import { Avatar, AvatarStack } from "./avatar";
 import { Empty } from "./empty";
+import { newestFirst } from "./finances/invoice-pill";
 import { Icon } from "./icons";
+import { InvoiceEditor } from "./invoice-editor";
 import { JobForm } from "./job-form";
 import { StatusPill } from "./status-pill";
 import { useWorkspace } from "./workspace-provider";
@@ -450,15 +452,28 @@ function JobSheet({ job: j, dayIdx: rawDayIdx }: { job: Job; dayIdx: number }) {
           <button
             className="btn"
             onClick={async () => {
-              const out = await mutate<{ invoice: { number: string } }>(
+              const out = await mutate<{ invoice: { id: string; number: string } }>(
                 `/api/jobs/${j.id}/invoice`,
               );
               toast(`Invoice ${out.invoice.number} drafted`, "doc");
+              openModal(<InvoiceEditor invoiceId={out.invoice.id} />);
             }}
           >
             <Icon name="doc" /> Create invoice
           </button>
         )}
+
+        {can("finances") &&
+          (() => {
+            /* The latest invoice on this job, if any — the builder
+               shows it whatever state it is in. */
+            const inv = newestFirst(ws.invoices.filter((i) => i.jobId === j.id))[0];
+            return inv ? (
+              <button className="btn" onClick={() => openModal(<InvoiceEditor invoiceId={inv.id} />)}>
+                <Icon name="receipt" /> View invoice {inv.number}
+              </button>
+            ) : null;
+          })()}
 
         {canEdit && (
           <button

@@ -19,7 +19,25 @@ account by signing up at `/login` with `marisol@craftyto.ca` — the role and
 position already on file are kept, which is the same rule that applies to
 anyone an admin adds to the Directory later.
 
-On a genuinely empty database the first person to sign up becomes the admin.
+On a genuinely empty database the first person to sign up becomes the owner.
+
+### Roles
+
+| Role | What it can do |
+|---|---|
+| Owner | Everything, including passing the owner seat on. One person. |
+| Admin | Everything but the owner seat: money, invoices, catalogue, roles. |
+| Moderator | Jobs, crew, menus, the directory, time off. No money. |
+| Crew | Their own schedule, the calendar, chat, the directory. |
+
+To seat the owner on a database that already has people:
+
+```bash
+npm run db:owner -- taso@example.com
+```
+
+The same thing can be done from the Directory — while nobody holds the seat,
+an admin can hand it to one person; after that only the owner can move it.
 
 For a throwaway development database you can skip the ceremony:
 
@@ -40,17 +58,42 @@ app/
   outreach/         the public enquiry form — the only page without a session
   api/              route handlers (see below)
   app.css           the stylesheet, carried over from the vanilla build
+  styles/           dashboard.css, invoicing.css — the 1.2 screens
   globals.css       Tailwind + the palette mirrored into @theme
-components/         the shell, the job side panel, shared bits
+components/
+  dashboard/        one file per dashboard widget
+  finances/         the invoice document preview, kit and catalogue forms
+  invoice-editor.tsx the invoice builder
+  the shell, the job side panel, shared bits
 lib/
   types.ts          the domain shapes
   domain.ts         the rules — permissions, per-day fallbacks, money
+  pdf/              the invoice PDF
   db.ts             the MySQL pool
   repo/             everything that touches the database
   auth.ts session.ts
 db/
-  schema.sql migrate.ts seed.ts
+  schema.sql migrate.ts seed.ts make-owner.ts
 ```
+
+## Invoicing
+
+An invoice carries its own **lines** — description, quantity, unit, rate —
+rather than being re-priced from its job every time it is looked at. Build
+one from the job sheet ("Create invoice") or from Finances, then add items
+from the **catalogue** or drop in a whole **kit**: a named bundle like
+"Golden-hour add-on" that expands into its lines in one click. Kits and
+catalogue items are copied onto the invoice, so changing a price next season
+never rewrites an invoice that already went out.
+
+Marking an invoice **sent** renders the PDF and archives it. From then on
+`/api/invoices/<id>/pdf` serves that exact copy — what the client actually
+received — while a draft renders live from whatever is on screen. Add
+`?download=1` to get it as a download instead of in the browser.
+
+Tracking lives on the Finances → Invoices tab and on the dashboard: drafts,
+sent, **overdue** (sent and past its due date), and paid, with the days
+overdue counted for you.
 
 ## Two endpoints not to touch
 

@@ -16,7 +16,7 @@
      we sent" means from then on, whatever the job does later.
    ============================================================ */
 
-import { execute, query, queryOne, transaction } from "../db";
+import { execute, isoDateTime, mysqlDateTime, query, queryOne, transaction } from "../db";
 import { invoiceNumber, todayISO } from "../domain";
 import type { BillTo, Invoice, InvoiceLine, InvoiceStatus } from "../types";
 
@@ -48,17 +48,6 @@ interface LineRow {
   catalog_item_id: string | null;
   kit_id: string | null;
 }
-
-/** 'yyyy-mm-dd hh:mm:ss' from the database → ISO 8601 for the client. */
-const isoDateTime = (s: string | null): string | null =>
-  s ? new Date(s.replace(" ", "T")).toISOString() : null;
-
-const mysqlDateTime = (d: Date): string => {
-  const p = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(
-    d.getMinutes(),
-  )}:${p(d.getSeconds())}`;
-};
 
 const toLine = (r: LineRow): InvoiceLine => ({
   description: r.description,

@@ -26,11 +26,16 @@ app/
   login/  outreach/  api/
   app.css           the stylesheet the whole app is built on
   globals.css       Tailwind + the palette mirrored into @theme
-components/         shell, job panel, job form, shared primitives
+components/
+  dashboard/        one file per dashboard widget, plus the registry
+  finances/         invoice document preview, kit + catalogue forms
+  invoice-editor.tsx, job-panel.tsx, job-form.tsx, shell, primitives
 lib/
   types.ts domain.ts format.ts db.ts auth.ts session.ts api.ts nav.ts
+  invoice-input.ts  parsing invoice bodies off the wire
+  pdf/              the invoice PDF renderer
   repo/             the only code that touches the database
-db/                 schema.sql, migrate.ts, seed.ts
+db/                 schema.sql, migrate.ts, seed.ts, make-owner.ts
 ```
 
 ## House rules
@@ -49,7 +54,8 @@ connection.
 
 **Permissions are checked on the server, every time.** `requireUser()` and
 `requirePermission()` in `lib/auth.ts`; the permission map itself is
-`can()` in `lib/domain.ts`. The nav hiding a link is a courtesy, not a
+`can()` in `lib/domain.ts`. Roles run owner → admin → moderator → crew.
+The nav hiding a link is a courtesy, not a
 boundary — `lib/nav.ts` also gates the routes, and the API gates itself.
 `loadWorkspace()` filters what a person is even sent: crew get only the jobs
 they are booked on, and money never leaves the server for a non-admin.
@@ -68,6 +74,50 @@ explicit `has_crew_override` / `has_menu_override` flags rather than
 inferring from row count. `lib/repo/job-edits.ts` owns the copy-on-write.
 Get this wrong and editing Tuesday silently changes Wednesday — which is
 the bug the whole design is there to prevent.
+
+**why: the owner seat.** `owner` is the business owner's role and holds
+every permission, including the one an admin must not have: moving the seat
+itself. `mayAssignRole()` in `lib/domain.ts` is the whole rule and both the
+API and the Directory's role picker read it. The one deliberate exception —
+while *nobody* is owner yet, an admin may seat one person — is what lets an
+existing database get an owner from the Directory instead of a console.
+`npm run db:owner -- <email>` does the same thing from the command line.
+
+**why: invoices hold their own lines.** An invoice used to be priced from
+its job every time it was rendered, so editing a wrapped job silently
+changed an invoice that had already gone out. Now an invoice carries its own
+lines and a snapshot of the billing address, and the PDF is archived in
+`invoice_documents` the moment it is marked sent. From then on "the invoice
+we sent" means those bytes. Lines are frozen once an invoice leaves draft;
+reopening a sent invoice discards the archived PDF, and a paid one cannot be
+reopened at all. Invoices written before 1.2 have no lines, and
+`invoiceLines()` prices those from the job exactly as the old build did — so
+nothing on an older database changes value on upgrade.
+
+**why: kits are copied, not referenced.** A kit is a named bundle of
+catalogue items. Dropping one onto an invoice copies its lines
+(`kitLines()`), the same rule menus already follow, so re-pricing a kit next
+season never rewrites last season's invoice. That is why
+`invoice_lines.catalog_item_id` and `kit_id` are plain columns rather than
+foreign keys.
+
+**why: the dashboard is per person.** `dashboard_layouts` holds one JSON
+layout per account — which widgets, in what order, at what width, which stat
+tiles, and a private scratchpad. It is run through `normalizeDashboard()`
+against the reader's role on every read and every write, so a widget a role
+may not see cannot be pinned into a layout, and a layout that ends up empty
+falls back to the default rather than rendering a blank page.
+
+**Nothing runs on a timer.** Quiet-hours chat was already like this; the
+unanswered-request reminder is too. `remindStaleRequests()` is called from
+the workspace load for anyone who can see requests, and the `UPDATE` on
+`reminded_at` is what stops two simultaneous pollers both sending it.
+
+**Schema changes go in two places.** `db/schema.sql` describes a fresh
+database; the patch list in `db/migrate.ts` brings an existing one up to
+date. MySQL 8 has no `ADD COLUMN IF NOT EXISTS`, so each patch checks
+`information_schema` first. Adding a column to only one of the two is the
+mistake to avoid — the deployed database is the one that has been running.
 
 **why: no live sync.** Firestore used to push changes. Now the client polls:
 `components/workspace-provider.tsx` re-fetches the whole workspace every 8s
@@ -101,8 +151,9 @@ npm run build        # what the server runs on deploy
 npm start
 npm run typecheck    # tsc --noEmit
 npm run lint
-npm run db:migrate   # apply db/schema.sql (idempotent)
+npm run db:migrate   # apply db/schema.sql + patches (idempotent)
 npm run db:seed      # demo data; -- --force to wipe and reload
+npm run db:owner -- taso@example.com   # hand someone the owner seat
 ```
 
 Run `npm run typecheck`, `npm run lint` and `npm run build` before calling

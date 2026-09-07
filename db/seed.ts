@@ -27,7 +27,17 @@ const addDays = (isoStr: string, n: number) => {
 };
 const now = Date.now();
 const hrs = (n: number) => now - n * 3600 * 1000;
-const dt = (ms: number) => new Date(ms).toISOString().slice(0, 19).replace("T", " ");
+/* MySQL DATETIME is server-local, so these are written the same way
+   lib/db.ts writes them — not toISOString(), which is UTC and would
+   make every seeded timestamp wrong by the machine's offset. */
+const dt = (ms: number) => {
+  const d = new Date(ms);
+  const p = (n: number) => String(n).padStart(2, "0");
+  return (
+    `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ` +
+    `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`
+  );
+};
 
 /* ---------- the crew ---------- */
 
