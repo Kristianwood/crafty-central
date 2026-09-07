@@ -95,10 +95,13 @@ caller read, and the PDF is archived from the row that actually committed,
 so a concurrent save cannot leave an archive describing something else.
 
 The migration backfills the lines of every invoice written before 1.2, at
-the value its job priced out to on the day of the upgrade — so nothing
-changes value, and nothing stays live-priced afterwards. `invoiceLines()`
-still falls back to the job for an invoice with no lines, which is now only
-a belt-and-braces path.
+the value its job priced out to on the day of the upgrade, so nothing stays
+live-priced afterwards. The total can land a cent above what 1.0 *displayed*
+on an invoice whose subtotal ended in half a cent: 1.0 multiplied the tax in
+one go and rounded at the very end, and 1.2 rounds each line and the tax, so
+the lines shown always add up to the total shown. `invoiceLines()` still
+falls back to the job for an invoice with no lines, which is now only a
+belt-and-braces path.
 
 **Deleting.** A job whose invoice has already gone out is not deletable:
 the foreign keys cascade, and that invoice is the only record of what the
@@ -177,6 +180,10 @@ npm run db:owner -- taso@example.com   # hand someone the owner seat
 Run `npm run typecheck`, `npm run lint` and `npm run build` before calling
 work finished. A build that fails on the server is a deploy that never
 happens.
+
+If `typecheck` ever complains about duplicate identifiers in files named
+like `routes.d 3.ts`, that is a stale `.next` — the folder is synced, and
+the sync made copies. `rm -rf .next` and run it again.
 
 ## Deployment
 

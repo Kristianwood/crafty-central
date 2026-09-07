@@ -50,9 +50,12 @@ export function AddWidgetTray({
       )}
 
       {nothingShown && (
+        /* It used to say the default came back on save. It does not:
+           an empty dashboard is now taken at face value, so the warning
+           has to describe what actually happens. */
         <p className="dash-tray-warn">
-          <Icon name="alert" /> An empty dashboard goes back to the default for your role when
-          it is saved.
+          <Icon name="alert" /> Nothing is showing. Save it that way if you like — the tray stays
+          here, and &ldquo;Reset to default&rdquo; brings everything back.
         </p>
       )}
     </div>
