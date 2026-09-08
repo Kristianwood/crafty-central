@@ -26,6 +26,7 @@ app/
   login/  outreach/  api/
   app.css           the stylesheet the whole app is built on
   styles/           dashboard.css and invoicing.css — the 1.2 surfaces
+  outreach/outreach.css   the public booking page, its own sheet
   globals.css       Tailwind + the palette mirrored into @theme
 components/
   dashboard/        one file per dashboard widget, plus the registry
@@ -36,7 +37,7 @@ lib/
   invoice-input.ts  parsing invoice bodies off the wire
   pdf/              the invoice PDF renderer
   repo/             the only code that touches the database
-db/                 schema.sql, migrate.ts, seed.ts, make-owner.ts
+db/                 schema.sql, migrate.ts, seed.ts, make-owner.ts, reset.ts
 ```
 
 ## House rules
@@ -49,15 +50,28 @@ in the `:root` block at the top of it (and mirror it in the `@theme` block in
 over markup that app.css already styles — you will get both and neither.
 Tailwind is there for genuinely new one-off layout.
 
-There are **three** hand-written sheets, not one: `globals.css` imports
+There are **four** hand-written sheets, not one: `globals.css` imports
 `app.css`, `app/styles/dashboard.css` and `app/styles/invoicing.css` in that
-order. Before concluding a class has no rule, or that a screen has no
-small-screen handling, grep all three — a rule for the same selector in a
+order, and the public booking page imports `app/outreach/outreach.css` on its
+own. Before concluding a class has no rule, or that a screen has no
+small-screen handling, grep all four — a rule for the same selector in a
 later sheet wins.
+
+**Check the built stylesheet, not the source.** `next build` runs the CSS
+through Tailwind v4's optimiser, and it will silently delete declarations it
+decides are redundant — a `max-height` on a second rule matching an element
+that already has one, and anything with `dvh` nested inside `calc()` or
+`min()`, both vanish from the production bundle while working perfectly under
+`next dev`. If a rule does not seem to apply, grep the file under
+`.next/static/chunks/*.css` before debugging specificity.
 
 **Phones get tested at 375px and 320px.** The breakpoints are 900px (where
 the sidebar becomes a bottom tab bar), 600px and, for the tab bar itself,
-360px. The failure to look for is not overflow — a flex row that will not
+360px. The safe-area insets are read once into `--sa-top/right/bottom/left`
+at the top of `app.css`; anything that touches an edge of the screen adds the
+matching one to its padding. Reading them through variables means a notch can
+be faked in a desktop browser (`:root{--sa-top:59px;--sa-left:59px;…}`) to
+check the layout holds. The failure to look for is not overflow — a flex row that will not
 wrap does not overflow, it crushes, and a production name squeezed into 60px
 or a date range into 21px reads as "cut off" while the page still measures
 clean. Check computed widths, not just `scrollWidth`.
@@ -248,3 +262,13 @@ the app should write to them.
 
 Run `npm run db:migrate` on the server once before the first deploy. It is
 idempotent, so running it again after a schema change is safe.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->
