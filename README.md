@@ -155,6 +155,17 @@ that happens the app says so: signing in shows a page naming the command.
 Running it takes a moment, loses nothing, and the app recovers without a
 restart.
 
+`db:migrate` only ever adds. It creates the tables and columns 1.2 needs
+and fills in the ones existing rows were missing; it has no `DROP`, no
+`TRUNCATE` and no `DELETE`, and running it twice is a no-op. On a database
+that already holds real work, the only thing it changes about a row you
+already had is storing a blank email as NULL rather than an empty string —
+which the app still reads as blank.
+
+`db:seed` is the destructive one. On a database that already has people in
+it, it refuses; with `--force` it empties every table and reloads the demo
+data. Never point it at the live database.
+
 Roll back safely: the 1.2 schema does not disturb 1.0, but the **owner
 role** does — 1.0 does not know it and grants it nothing, so that person
 would find the app empty. Seat the owner only once 1.2 has settled, and
