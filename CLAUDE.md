@@ -140,6 +140,24 @@ date. MySQL 8 has no `ADD COLUMN IF NOT EXISTS`, so each patch checks
 `information_schema` first. Adding a column to only one of the two is the
 mistake to avoid — the deployed database is the one that has been running.
 
+**A deploy does not migrate.** The Command Center unpacks, builds, restarts
+and checks `/api/health` and `/api/version` — none of which touch the
+database. So a release that needs a schema change starts cleanly, reports
+success, and then fails on every signed-in screen. That is what 1.2 did on
+its first upload. `npm run db:migrate` on the server is the fix, and the app
+now says so: a missing table or column is turned into `SchemaOutOfDate` in
+`lib/db.ts`, which the API answers as a 503 and the signed-in layout renders
+as a page naming the command. Ship a schema change and the migration
+together, and expect to run it by hand.
+
+**why: rolling back past a role.** The 1.2 schema is safe to roll back to
+1.0 — the extra tables and columns are simply ignored, and `SELECT *`
+does not mind them. The owner *role* is not: `can()` in 1.0 looks a role up
+in a map that has no `owner` in it, so whoever holds the seat gets no
+permissions at all and lands in an app with nothing in it. Seat the owner
+only once the release has settled, and demote them to admin before any
+rollback.
+
 **why: no live sync.** Firestore used to push changes. Now the client polls:
 `components/workspace-provider.tsx` re-fetches the whole workspace every 8s
 (paused while the tab is hidden) and after every mutation; chat polls its
