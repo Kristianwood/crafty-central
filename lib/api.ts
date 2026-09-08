@@ -8,6 +8,7 @@
 
 import { NextResponse } from "next/server";
 import { Forbidden, Unauthorized } from "./auth";
+import { SchemaOutOfDate } from "./db";
 
 export const json = <T>(data: T, status = 200) =>
   NextResponse.json(data, { status, headers: { "Cache-Control": "no-store" } });
@@ -22,6 +23,12 @@ export async function handle<T>(fn: () => Promise<T>): Promise<NextResponse> {
     if (err instanceof Unauthorized) return fail("Not signed in", 401);
     if (err instanceof Forbidden) return fail(err.message, 403);
     if (err instanceof ApiError) return fail(err.message, err.status);
+    /* Says the same thing in production as in development on purpose:
+       it names the command that fixes it and gives nothing away. */
+    if (err instanceof SchemaOutOfDate) {
+      console.error("Schema out of date:", err.detail);
+      return fail(err.message, 503);
+    }
     console.error("API error:", err);
     const isDev = process.env.NODE_ENV !== "production";
     return fail(

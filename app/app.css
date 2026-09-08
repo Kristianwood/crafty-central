@@ -2094,3 +2094,27 @@ textarea { border-radius: 20px; background: var(--card); }
 @media (max-width: 900px) {
   .stat-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+/* The screen a deploy gets when the database is older than the build.
+   Deliberately plain: whoever is looking at it needs the command, not
+   a design. */
+.migrate-cmd {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 13.5px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin: 4px 0 18px;
+  overflow-x: auto;
+  user-select: all;
+  -webkit-user-select: all;
+}
+.migrate-detail {
+  font-size: 11.5px;
+  color: var(--ink-3);
+  margin-top: 18px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line-soft);
+  overflow-wrap: break-word;
+}

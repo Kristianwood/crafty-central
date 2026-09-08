@@ -146,4 +146,16 @@ the way it always did. Two things carried over that are worth knowing:
 | Port | whatever you assign the site |
 
 `.env` lives on the server and survives every deploy and rollback.
-Run `npm run db:migrate` there once before the first deploy.
+
+**Run `npm run db:migrate` on the server as part of any release that
+changes the schema — 1.2 does.** A deploy does not run it, and the health
+and version checks do not touch the database, so an un-migrated release
+reports a successful deploy and then fails on every signed-in screen. When
+that happens the app says so: signing in shows a page naming the command.
+Running it takes a moment, loses nothing, and the app recovers without a
+restart.
+
+Roll back safely: the 1.2 schema does not disturb 1.0, but the **owner
+role** does — 1.0 does not know it and grants it nothing, so that person
+would find the app empty. Seat the owner only once 1.2 has settled, and
+demote them to admin first if you ever go back.

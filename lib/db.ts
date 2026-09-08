@@ -49,13 +49,50 @@ export function pool(): mysql.Pool {
   return global.__craftyPool;
 }
 
+/**
+ * The database is older than the code running against it.
+ *
+ * This is what a deploy that skipped `npm run db:migrate` looks like
+ * from the inside: the build is fine, the app starts, /api/health and
+ * /api/version both answer — and then every query that touches a new
+ * table or column fails. Left as a raw MySQL error it surfaced as
+ * "Something went wrong on our end." on every screen, which says
+ * nothing about the one command that fixes it.
+ */
+export class SchemaOutOfDate extends Error {
+  readonly detail: string;
+  constructor(detail: string) {
+    super(
+      "The database is behind this build. Run `npm run db:migrate` on the server " +
+        "to bring it up to date, then reload.",
+    );
+    this.name = "SchemaOutOfDate";
+    this.detail = detail;
+  }
+}
+
+/** MySQL's two ways of saying "that is not in this database". */
+const MISSING_SCHEMA = new Set(["ER_NO_SUCH_TABLE", "ER_BAD_FIELD_ERROR"]);
+
+function rethrow(err: unknown): never {
+  const code = (err as { code?: string } | null)?.code;
+  if (code && MISSING_SCHEMA.has(code)) {
+    throw new SchemaOutOfDate((err as { sqlMessage?: string }).sqlMessage ?? String(err));
+  }
+  throw err;
+}
+
 /** SELECT returning rows. */
 export async function query<T = Record<string, unknown>>(
   sql: string,
   params: SqlValue[] = [],
 ): Promise<T[]> {
-  const [rows] = await pool().query(sql, params);
-  return rows as T[];
+  try {
+    const [rows] = await pool().query(sql, params);
+    return rows as T[];
+  } catch (err) {
+    rethrow(err);
+  }
 }
 
 /** SELECT returning at most one row. */
@@ -72,8 +109,12 @@ export type SqlValue = string | number | boolean | null | Date | Buffer;
 
 /** INSERT / UPDATE / DELETE. */
 export async function execute(sql: string, params: SqlValue[] = []) {
-  const [result] = await pool().execute(sql, params);
-  return result as mysql.ResultSetHeader;
+  try {
+    const [result] = await pool().execute(sql, params);
+    return result as mysql.ResultSetHeader;
+  } catch (err) {
+    rethrow(err);
+  }
 }
 
 /**
@@ -92,7 +133,7 @@ export async function transaction<T>(
     return out;
   } catch (err) {
     await conn.rollback();
-    throw err;
+    rethrow(err);
   } finally {
     conn.release();
   }
