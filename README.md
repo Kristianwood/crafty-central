@@ -88,8 +88,14 @@ never rewrites an invoice that already went out.
 
 Marking an invoice **sent** renders the PDF and archives it. From then on
 `/api/invoices/<id>/pdf` serves that exact copy — what the client actually
-received — while a draft renders live from whatever is on screen. Add
-`?download=1` to get it as a download instead of in the browser.
+received — while a draft renders live from whatever is on screen.
+
+Every **PDF** button opens `/invoices/<id>`: the invoice on a page of its
+own, with a Download PDF button on it. The buttons deliberately do not point
+a tab at the PDF endpoint — a phone browser has no inline PDF viewer, so it
+diverts the file to the download manager and abandons the tab it just
+opened, which is how the office kept landing on a blank page. A page always
+paints; a PDF response does not.
 
 Tracking lives on the Finances → Invoices tab and on the dashboard: drafts,
 sent, **overdue** (sent and past its due date), and paid, with the days

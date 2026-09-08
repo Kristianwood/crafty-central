@@ -2,7 +2,7 @@ import { bad, handle } from "@/lib/api";
 import { ROLE_LABELS, ROLE_RANK } from "@/lib/domain";
 import { requirePermission } from "@/lib/auth";
 import { deletePerson, getPerson } from "@/lib/repo/people";
-import { jobIdsForPerson } from "@/lib/repo/jobs";
+import { openJobIdsForPerson } from "@/lib/repo/jobs";
 
 export const dynamic = "force-dynamic";
 type Params = { params: Promise<{ id: string }> };
@@ -27,12 +27,20 @@ export async function DELETE(_req: Request, { params }: Params) {
       bad("The owner cannot be removed. Pass the seat on first.", 403);
     }
 
-    if (person.hasAccount) {
-      bad("That person has an account — an admin has to close it first.", 409);
-    }
-    const booked = await jobIdsForPerson(id);
+    /* Having signed in is not a reason to keep someone on the books.
+       Nothing in the app can close an account, so refusing here left
+       every employee who had ever logged in un-removable — the
+       Directory said "an admin has to close it first" and no admin,
+       anywhere, had a way to do it. Removing them takes their login
+       with them: sessions cascade, so they are signed out at once. */
+    const booked = await openJobIdsForPerson(id);
     if (booked.length) {
-      bad(`They are still booked on ${booked.length} job${booked.length === 1 ? "" : "s"}.`, 409);
+      bad(
+        `They are still on the crew for ${booked.length} job${booked.length === 1 ? "" : "s"} that ` +
+          `${booked.length === 1 ? "has" : "have"} not wrapped. Take them off ` +
+          `${booked.length === 1 ? "it" : "those"} first.`,
+        409,
+      );
     }
     await deletePerson(id);
     return { ok: true };

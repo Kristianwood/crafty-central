@@ -2118,3 +2118,96 @@ textarea { border-radius: 20px; background: var(--card); }
   border-top: 1px solid var(--line-soft);
   overflow-wrap: break-word;
 }
+
+
+/* ════════════════════════════════════════════════════════════════
+   1.2.2 — the phone pass
+
+   Everything below is about one failure mode: a flex row that will
+   not wrap, on a screen that cannot hold it. Flexbox does not
+   overflow in that situation, it CRUSHES — a production name gets
+   60px and stacks one word per line, a date range gets 21px, a
+   button lands past the right edge of a container that clips it.
+   Nothing scrolls, so nothing looks broken from the outside; the
+   content is simply gone. That is what "cut off on mobile" meant.
+
+   The rules are grouped by the width at which they start to matter,
+   and every one of them lives inside a max-width query so the
+   desktop layout is provably untouched.
+   ════════════════════════════════════════════════════════════════ */
+
+/* The bell sat in the topbar's flex line with nothing stopping it
+   being squeezed: a 36px circle rendered as a ~24px oval. */
+.icon-btn { flex: none; }
+
+/* Four role tags on one person overran the day count beside them. */
+.wl-tags { flex-wrap: wrap; min-width: 0; }
+
+@media (max-width: 900px) {
+  /* The calendar's month title and its Today / New job controls were
+     one nowrap line 408px wide in a 343px column, so "New job" —
+     the only way to start one — was clipped off the right edge and
+     could not be reached or tapped. */
+  .cal-head { flex-wrap: wrap; }
+  .cal-nav { flex: 1 1 100%; justify-content: space-between; }
+
+  /* A footer of three buttons had no wrap, so each label collapsed
+     into a column of single letters. */
+  .modal-foot { flex-wrap: wrap; }
+  .modal-foot .btn { white-space: nowrap; padding-left: 14px; padding-right: 14px; }
+
+  /* The day tabs on a job brief shared a line with the title and got
+     100px between them; Day 2 and Day 3 were unreachable. The 100%
+     basis is what makes the already-wrapping topline break. */
+  .brief-days { flex: 1 1 100%; }
+}
+
+@media (max-width: 600px) {
+  /* The name and role beside the avatar forced the topbar to two
+     lines and pushed the chip off a 320px screen. The avatar stays,
+     and it is the part you tap. */
+  .topbar-user .u-meta { display: none; }
+
+  /* A month grid on a phone gives each day 42px. A job chip in there
+     held 160px of production name and showed two characters of it —
+     worse than useless, because it read as a different job every
+     time. Below 600px the chips become status bars: still tappable,
+     still one per job, and the names are one tap away in the day
+     panel. The outline keeps time off distinguishable once the
+     labels are gone. */
+  .cal-grid { gap: 4px; }
+  .cal-cell { padding: 4px 4px 5px; gap: 3px; }
+  .cal-job { font-size: 0; min-height: 22px; height: auto; padding: 0; border-radius: 5px; }
+  .cal-job .cj-daynum { display: none; }
+  .cal-job .cj-miss { display: block; width: 5px; height: 5px; margin: 8px 0 0 5px; }
+  .cal-job.timeoff { background: var(--bg); box-shadow: inset 0 0 0 1px var(--line); }
+
+  /* "+3 more" is wider than the cell it lives in and spilled into the
+     next day. The count carries the meaning; the word does not. */
+  .cal-more { width: 100%; padding: 3px 4px; text-align: center; }
+  .cal-more .cm-word { display: none; }
+
+  /* The remove button on a shoot-day chip is a bare × — a 7x18px
+     target on the form a client fills in from their phone. Give it a
+     box of its own, and let it lean out of the chip rather than
+     reaching back over the date it sits beside. */
+  .day-chip button {
+    position: relative;
+    display: inline-grid;
+    place-items: center;
+    width: 24px;
+    height: 24px;
+    margin: -3px -7px -3px -1px;
+  }
+  .day-chip button::after { content: ""; position: absolute; inset: -8px -4px; }
+}
+
+@media (max-width: 360px) {
+  /* Seven tabs across the bottom need 323px of a 304px bar on the
+     narrowest phones still sold, so Finances — the last one — had its
+     label sliced down the middle. Tighten the padding rather than
+     drop a destination. */
+  .sidebar { padding-left: 4px; padding-right: 4px; }
+  .nav-link { padding: 6px 2px; font-size: 9px; }
+  .nav-link .nav-badge { right: calc(50% - 18px); }
+}

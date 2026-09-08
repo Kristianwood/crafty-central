@@ -25,6 +25,7 @@ app/
     brief/[jobId]/
   login/  outreach/  api/
   app.css           the stylesheet the whole app is built on
+  styles/           dashboard.css and invoicing.css — the 1.2 surfaces
   globals.css       Tailwind + the palette mirrored into @theme
 components/
   dashboard/        one file per dashboard widget, plus the registry
@@ -47,6 +48,19 @@ in the `:root` block at the top of it (and mirror it in the `@theme` block in
 `globals.css`). Do not restyle a component by sprinkling Tailwind utilities
 over markup that app.css already styles — you will get both and neither.
 Tailwind is there for genuinely new one-off layout.
+
+There are **three** hand-written sheets, not one: `globals.css` imports
+`app.css`, `app/styles/dashboard.css` and `app/styles/invoicing.css` in that
+order. Before concluding a class has no rule, or that a screen has no
+small-screen handling, grep all three — a rule for the same selector in a
+later sheet wins.
+
+**Phones get tested at 375px and 320px.** The breakpoints are 900px (where
+the sidebar becomes a bottom tab bar), 600px and, for the tab bar itself,
+360px. The failure to look for is not overflow — a flex row that will not
+wrap does not overflow, it crushes, and a production name squeezed into 60px
+or a date range into 21px reads as "cut off" while the page still measures
+clean. Check computed widths, not just `scrollWidth`.
 
 **The database is only touched from `lib/repo/`.** Route handlers validate
 input and check permissions; repos do the SQL. Nothing else opens a
@@ -107,6 +121,16 @@ belt-and-braces path.
 the foreign keys cascade, and that invoice is the only record of what the
 client was charged. Drafts go with the job. Nobody deletes a person of
 higher rank, and the owner is not deletable at all.
+
+Removing a person is otherwise allowed, including someone who has signed in.
+1.2.0 refused that — "an admin has to close it first" — and nothing in the
+app, or out of it, could close an account, so in practice no real employee
+could ever be taken off the books. The one bar left is
+`openJobIdsForPerson()`: they cannot go while they are crewed on a job that
+has not wrapped, because that would quietly leave a live call sheet short.
+Jobs they have already worked do not count. Everything of theirs cascades —
+sessions, time off, chat messages, dashboard — so the Directory says as much
+before it asks.
 
 **why: kits are copied, not referenced.** A kit is a named bundle of
 catalogue items. Dropping one onto an invoice copies its lines

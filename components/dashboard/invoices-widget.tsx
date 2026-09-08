@@ -112,16 +112,14 @@ export function InvoicesWidget() {
               </span>
               <span className="ir-total">{fmtMoney(total)}</span>
               <span className={`pill ${PILL[state]}`}>{STATE_LABEL[state]}</span>
-              <a
+              <Link
                 className="ir-pdf"
-                href={`/api/invoices/${inv.id}/pdf`}
-                target="_blank"
-                rel="noopener"
+                href={`/invoices/${inv.id}`}
                 title="Open PDF"
                 aria-label={`Open PDF for ${inv.number}`}
               >
                 <Icon name="doc" />
-              </a>
+              </Link>
             </div>
           ))}
         </div>

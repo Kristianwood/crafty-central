@@ -87,7 +87,11 @@ export function InvoiceEditor({ invoiceId }: { invoiceId: string }) {
   );
 }
 
-const pdfUrl = (id: string, q = "") => `/api/invoices/${id}/pdf${q}`;
+/* The file itself. Only ever used behind a `download` attribute —
+   pointing a tab at it is what produced the blank page on phones. */
+const pdfFile = (id: string) => `/api/invoices/${id}/pdf?download=1`;
+/* The page that shows it, which every browser can paint. */
+const pdfPage = (id: string) => `/invoices/${id}`;
 
 /* ---------- header, shared by both views ---------- */
 
@@ -295,19 +299,16 @@ function DraftEditor({ inv, job }: { inv: Invoice; job: Job | undefined }) {
 
   async function onPreview() {
     if (!dirty) {
-      window.open(pdfUrl(inv.id, "?live=1"), "_blank", "noopener");
+      window.open(pdfPage(inv.id), "_blank");
       return;
     }
     /* Open the tab before the await, while this still counts as the
-       click that asked for it; the popup blocker sees nothing else. */
-    const w = window.open("", "_blank");
+       click that asked for it; the popup blocker sees nothing else.
+       It lands on a real page, so even if the save fails the tab has
+       something to show rather than staying blank. */
+    const w = window.open(pdfPage(inv.id), "_blank");
     const saved = await save();
-    if (!saved) {
-      w?.close();
-      return;
-    }
-    if (w) w.location.href = pdfUrl(inv.id, "?live=1");
-    else window.open(pdfUrl(inv.id, "?live=1"), "_blank", "noopener");
+    if (saved) w?.location.reload();
   }
 
   async function onSend() {
@@ -613,7 +614,7 @@ function DraftEditor({ inv, job }: { inv: Invoice; job: Job | undefined }) {
           Cancel
         </button>
         <button type="button" className="btn" onClick={onPreview} disabled={busy}>
-          <Icon name="external" /> Preview PDF
+          <Icon name="external" /> Preview
         </button>
         <button type="button" className="btn" onClick={onSave} disabled={busy || !dirty}>
           <Icon name="check" /> {dirty ? "Save draft" : "Saved"}
@@ -692,7 +693,7 @@ function SentView({ inv, job }: { inv: Invoice; job: Job | undefined }) {
       <InvoiceDoc job={job} invoice={inv} />
 
       <div className="modal-foot inv-foot">
-        <a className="btn" href={pdfUrl(inv.id, "?download=1")} target="_blank" rel="noopener">
+        <a className="btn" href={pdfFile(inv.id)} download>
           <Icon name="download" /> Download PDF{inv.hasDocument ? " (as sent)" : ""}
         </a>
         <span className="inv-hint" style={{ marginRight: "auto" }}>
