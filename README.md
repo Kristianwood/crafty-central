@@ -172,6 +172,21 @@ which the app still reads as blank.
 it, it refuses; with `--force` it empties every table and reloads the demo
 data. Never point it at the live database.
 
+To clear the demo data for real and start on an empty site:
+
+```bash
+npm run db:fresh -- --keep you@yourdomain.com
+```
+
+That first form only reports — what is in the database, who it would keep,
+what it would delete — and changes nothing. Add `--yes` to do it. It keeps
+one person, the email you name, as the owner with their password intact, and
+the settings row (quiet hours and the default rates). Everything else goes:
+all other people, jobs, companies, menus, invoices, kits, catalogue items,
+messages, notifications, time off, booking requests and saved dashboards.
+There is no undo, so take a copy first — the script prints the `mysqldump`
+line for you.
+
 Roll back safely: the 1.2 schema does not disturb 1.0, but the **owner
 role** does — 1.0 does not know it and grants it nothing, so that person
 would find the app empty. Seat the owner only once 1.2 has settled, and

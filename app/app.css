@@ -41,6 +41,17 @@
   --ease: cubic-bezier(.16, 1, .3, 1);
   --sidebar-w: 240px;
   --panel-w: 440px;
+
+  /* The safe area, named once. The viewport is served viewport-fit=cover
+     (app/layout.tsx), so the page really does extend under the status
+     bar, the home indicator and — in landscape — the notch. Everything
+     that touches an edge adds the matching inset. Reading them through
+     variables rather than env() at each site means the whole set can be
+     given fake values to test a notch on a machine that has none. */
+  --sa-top: env(safe-area-inset-top, 0px);
+  --sa-right: env(safe-area-inset-right, 0px);
+  --sa-bottom: env(safe-area-inset-bottom, 0px);
+  --sa-left: env(safe-area-inset-left, 0px);
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -1386,7 +1397,7 @@ textarea { resize: vertical; min-height: 74px; }
     height: auto;
     flex-direction: row;
     align-items: center;
-    padding: 6px 8px calc(6px + env(safe-area-inset-bottom));
+    padding: 6px 8px calc(6px + var(--sa-bottom));
     border-right: none;
     border-top: 1px solid var(--line);
     background: rgba(236, 227, 208, .94);
@@ -1901,7 +1912,7 @@ textarea { border-radius: 20px; background: var(--card); }
   }
   .sidebar {
     border-top: 1px solid var(--line-soft);
-    padding: 6px 8px calc(6px + env(safe-area-inset-bottom));
+    padding: 6px 8px calc(6px + var(--sa-bottom));
     background: rgba(236, 227, 208, .94);
     z-index: 45;
   }
@@ -2211,3 +2222,86 @@ textarea { border-radius: 20px; background: var(--card); }
   .nav-link { padding: 6px 2px; font-size: 9px; }
   .nav-link .nav-badge { right: calc(50% - 18px); }
 }
+
+
+/* ════════════════════════════════════════════════════════════════
+   1.2.3 — the safe area, applied
+
+   The viewport is served viewport-fit=cover, which means the page is
+   laid out edge to edge and the phone's own furniture sits on top of
+   it: the status bar and (in landscape) the notch, and the home
+   indicator along the bottom. Only the tab bar was allowing for any
+   of that, so in the installed app the title sat under the clock,
+   and turned sideways the content ran under the notch.
+
+   Everything below is the same rule applied consistently: a box that
+   touches an edge of the screen adds the inset for that edge to its
+   padding. The values come from --sa-* at the top of this file.
+   ════════════════════════════════════════════════════════════════ */
+
+/* Toasts float over everything and sit at the bottom edge. */
+.toast-rail { bottom: calc(22px + var(--sa-bottom)); }
+
+/* A modal is centred in the whole viewport, notch included.
+
+   Its own 88dvh cap is left alone: every attempt to bring it down by
+   the insets was deleted from the production stylesheet by the CSS
+   optimiser (it survives `next dev` and vanishes from `next build` —
+   check the built file, not the source, before believing a rule
+   shipped). The residue is cosmetic: on a notched phone in the
+   installed app, a modal tall enough to hit the cap has its top edge
+   a few pixels under the status bar. Its content is inset 24px, so
+   nothing is actually covered. */
+.modal-scrim {
+  padding: calc(20px + var(--sa-top)) calc(20px + var(--sa-right))
+           calc(20px + var(--sa-bottom)) calc(20px + var(--sa-left));
+}
+
+
+@media (max-width: 900px) {
+  /* The topbar is the first thing under the status bar in the
+     installed app, where there is no browser chrome to hold it off. */
+  .topbar {
+    padding-top: calc(12px + var(--sa-top));
+    padding-left: calc(16px + var(--sa-left));
+    padding-right: calc(16px + var(--sa-right));
+  }
+
+  /* The scrolling column: side insets for landscape, and enough room
+     at the bottom to clear both the tab bar and the home indicator. */
+  .content {
+    padding-left: calc(16px + var(--sa-left));
+    padding-right: calc(16px + var(--sa-right));
+    padding-bottom: calc(110px + var(--sa-bottom));
+  }
+
+  /* The tab bar already cleared the home indicator; in landscape it
+     needs to clear the notch as well. */
+  .sidebar {
+    padding-left: calc(8px + var(--sa-left));
+    padding-right: calc(8px + var(--sa-right));
+  }
+
+  /* The job panel is a bottom sheet on a phone: its own scroller has
+     to end above the home indicator, not under it. */
+  .panel { padding-left: var(--sa-left); padding-right: var(--sa-right); }
+  .panel-inner { padding-bottom: calc(40px + var(--sa-bottom)); }
+
+  /* Toasts belong above the tab bar, not behind it. */
+  .toast-rail { bottom: calc(74px + var(--sa-bottom)); }
+
+}
+
+/* iOS draws a native control inside a date or time field and sizes it
+   from that control, not from the width we set, so the field ran past
+   the right edge of the card holding it — the one visible cut-off left
+   on the Schedule screen. Taking the native appearance off makes it an
+   ordinary box that honours its width like every other input. */
+input[type="date"], input[type="time"], input[type="datetime-local"], input[type="month"] {
+  -webkit-appearance: none;
+  appearance: none;
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+}
+.field { min-width: 0; }

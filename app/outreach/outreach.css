@@ -30,3 +30,14 @@
 }
 .oc-done .big svg { width: 26px; height: 26px; }
 .oc-foot { text-align: center; font-size: 12px; color: var(--ink-3); margin-top: 18px; }
+
+/* The booking form is a full-screen page on a phone with no app shell
+   around it, so it carries its own safe-area insets — the viewport is
+   served viewport-fit=cover and this page runs to every edge. The
+   --sa-* variables are declared in app/app.css. */
+.outreach-wrap {
+  padding-top: calc(28px + var(--sa-top));
+  padding-right: calc(16px + var(--sa-right));
+  padding-bottom: calc(60px + var(--sa-bottom));
+  padding-left: calc(16px + var(--sa-left));
+}

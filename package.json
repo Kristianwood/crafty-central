@@ -1,6 +1,6 @@
 {
   "name": "crafty-central",
-  "version": "1.2.2",
+  "version": "1.2.3",
   "private": true,
   "description": "The all-in-one hub for Crafty — jobs, calendar, crew, chat, and invoicing.",
   "scripts": {
@@ -11,7 +11,8 @@
     "typecheck": "tsc --noEmit",
     "db:migrate": "node --env-file-if-exists=.env --experimental-strip-types db/migrate.ts",
     "db:seed": "node --env-file-if-exists=.env --experimental-strip-types db/seed.ts",
-    "db:owner": "node --env-file-if-exists=.env --experimental-strip-types db/make-owner.ts"
+    "db:owner": "node --env-file-if-exists=.env --experimental-strip-types db/make-owner.ts",
+    "db:fresh": "node --env-file-if-exists=.env --experimental-strip-types db/reset.ts"
   },
   "dependencies": {
     "bcryptjs": "3.0.3",
