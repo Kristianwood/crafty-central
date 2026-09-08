@@ -356,4 +356,26 @@
   .ir-name { flex: 1 1 100%; white-space: normal; }
   .tj-foot { align-items: flex-start; flex-direction: column; }
   .req-row .to-actions { justify-content: flex-start; }
+
+  /* Time-off rows. Person, dates and two buttons will not sit on one
+     phone line, and a nowrap flex row answers by crushing all three —
+     the name to one word per line and "Sep 17 – Sep 19" to a 21px
+     sliver. Break it in two instead: who and why, then when and what
+     to do about it. The pill radius has to come down with it, or a
+     two-line row renders as an ellipse. */
+  .dash-widget .to-item { flex-wrap: wrap; border-radius: 20px; padding: 12px 14px; }
+  .dash-widget .to-item > div:first-child { flex: 1 1 100%; min-width: 0; }
+  .dash-widget .to-item .to-dates { white-space: nowrap; }
+  .dash-widget .to-item > .to-actions {
+    flex: 1 1 100%;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+
+  /* Thumb-sized, now that the row it sits in wraps anyway. */
+  .ir-pdf { width: 40px; height: 40px; flex: 0 0 auto; }
+
+  /* Customise mode: the size segments were 22px tall. */
+  .dw-tools { gap: 8px; }
+  .dw-seg .seg { padding: 9px 14px; }
 }

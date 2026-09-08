@@ -169,7 +169,7 @@ export default function CalendarView() {
                     openDayPanel(dISO);
                   }}
                 >
-                  +{extra} more
+                  +{extra}<span className="cm-word"> more</span>
                 </button>
               )}
             </div>

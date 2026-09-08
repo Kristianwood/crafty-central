@@ -374,3 +374,35 @@
 /* The moment between "draft created" and the snapshot that carries
    it. Sized so the modal does not jump when the real thing lands. */
 .inv-waiting { min-height: 180px; display: grid; place-items: center; }
+
+
+/* ════════════════════════════════════════════════════════════════
+   1.2.2 — the invoice document on a phone
+   ════════════════════════════════════════════════════════════════ */
+
+@media (max-width: 900px) {
+  /* The document is a Letter page rendered as HTML, so it does not
+     shrink below its own column widths. Inside the invoice modal the
+     Amount column ran off the card; inside the Finances table it was
+     pinned 622px wide in a scroller whose minimum is 560px, which put
+     every dollar figure off-screen with no way to reach it. Let the
+     document scroll on its own, and pin the expanded preview to the
+     viewport rather than to the table's width. */
+  .doc { padding: 16px 14px; overflow-x: auto; }
+  .doc td, .doc th { padding: 6px 3px; font-size: 12px; }
+
+  .fin-table tr.fin-doc-row .doc {
+    position: sticky;
+    left: 0;
+    width: calc(100vw - 32px);
+  }
+
+  /* The tables already scroll sideways, but 560px was not enough
+     room for six columns, so the browser took it out of the only
+     column that can wrap: production names came out ~110px wide and
+     stacked one word per line while the money columns sat comfortable.
+     Give the table enough width to lay out honestly and let the
+     scroller do its job. */
+  .fin-scroll > .fin-table { min-width: 700px; }
+  .fin-scroll > .fin-table tbody td:first-child { min-width: 170px; }
+}

@@ -263,10 +263,20 @@ export async function setJobStatus(id: string, status: JobStatus): Promise<void>
   await execute("UPDATE jobs SET status = ? WHERE id = ?", [status, id]);
 }
 
-/** Jobs a given person is booked on, for cascade checks and the directory. */
-export async function jobIdsForPerson(personId: string): Promise<string[]> {
+/**
+ * Jobs a person is booked on that have NOT finished yet — the ones
+ * removing them from the directory would quietly leave short-crewed.
+ *
+ * Deliberately not every job they have ever worked: a wrapped or
+ * invoiced shoot is history, and counting those meant anyone who had
+ * ever been on a call sheet could never be taken off the books.
+ */
+export async function openJobIdsForPerson(personId: string): Promise<string[]> {
   const rows = await query<{ job_id: string }>(
-    "SELECT DISTINCT job_id FROM job_crew WHERE person_id = ?",
+    `SELECT DISTINCT c.job_id
+       FROM job_crew c
+       JOIN jobs j ON j.id = c.job_id
+      WHERE c.person_id = ? AND j.status IN ('estimate','confirmed')`,
     [personId],
   );
   return rows.map((r) => r.job_id);

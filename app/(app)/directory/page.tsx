@@ -308,15 +308,24 @@ function PersonForm({ person }: { person?: Person }) {
 
   async function onDelete() {
     if (!p) return;
-    if (!confirm(`Remove ${p.name} from the directory?`)) return;
+    if (
+      !confirm(
+        `Remove ${p.name} from the directory?\n\n` +
+          "This signs them out and closes their account, and takes their time-off " +
+          "records and chat messages with them. Jobs they have already worked stay " +
+          "on the books, but their name comes off those crew lists.",
+      )
+    )
+      return;
     setBusy(true);
     try {
       await mutate(`/api/people/${p.id}`, undefined, "DELETE");
       closeModal();
       toast("Removed", "x");
     } catch {
-      /* Refused while they still have an account or a booking — the
-         server's reason is already on screen. */
+      /* Refused because they are still crewed on a job that has not
+         wrapped, or they outrank the person asking — the server's
+         reason is already on screen. */
       setBusy(false);
     }
   }

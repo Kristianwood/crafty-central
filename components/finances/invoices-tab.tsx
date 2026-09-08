@@ -9,6 +9,7 @@
    much, and the actions offered follow from that alone.
    ============================================================ */
 
+import Link from "next/link";
 import { useState } from "react";
 import { Empty } from "@/components/empty";
 import { Icon } from "@/components/icons";
@@ -164,15 +165,13 @@ export function InvoicesTab() {
                         <button className="btn sm" onClick={() => open(inv)}>
                           <Icon name="edit" /> Open
                         </button>
-                        <a
+                        <Link
                           className="btn sm"
-                          href={`/api/invoices/${inv.id}/pdf`}
-                          target="_blank"
-                          rel="noopener"
+                          href={`/invoices/${inv.id}`}
                           title={inv.hasDocument ? "The PDF as sent" : "PDF, rendered now"}
                         >
                           <Icon name="doc" /> PDF{inv.hasDocument ? " · as sent" : ""}
-                        </a>
+                        </Link>
                         {state === "draft" && (
                           <button className="btn sm" onClick={() => void markSent(inv)}>
                             <Icon name="send" /> Mark sent
